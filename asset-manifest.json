@@ -1,0 +1,19 @@
+{
+  "files": {
+    "main.css": "/static/css/main.ed697f9c.css",
+    "main.js": "/static/js/main.bb2feb30.js",
+    "static/media/waterlooCampus-modified.png": "/static/media/waterlooCampus-modified.fc4bd91e5c6f890311e8.png",
+    "static/media/placeholder.png": "/static/media/placeholder.a45c8b5b163ce21b7fd8.png",
+    "static/media/reffing-modified.png": "/static/media/reffing-modified.745d6bdcc2636b37106d.png",
+    "static/media/aviation-modified.png": "/static/media/aviation-modified.1e17d67b7be3322d6031.png",
+    "static/media/blindseer-modified.png": "/static/media/blindseer-modified.3ae5ff87c5aaccd5ccd5.png",
+    "static/media/logo.png": "/static/media/logo.d38fff378b906eee9f70.png",
+    "index.html": "/index.html",
+    "main.ed697f9c.css.map": "/static/css/main.ed697f9c.css.map",
+    "main.bb2feb30.js.map": "/static/js/main.bb2feb30.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ed697f9c.css",
+    "static/js/main.bb2feb30.js"
+  ]
+}
