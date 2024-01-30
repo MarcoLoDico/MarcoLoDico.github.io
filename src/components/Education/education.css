@@ -1,0 +1,60 @@
+.educationContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+#education {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.educationText {
+    flex: 2;
+    font-size: 2rem;
+    text-align: center;
+    padding: 10rem 5rem 10rem 10rem;
+    max-width: 70%;
+}
+
+.paragraphSpan{
+    /*text-align: left;*/
+}
+
+.shift{
+    margin-left: 2rem;
+}
+
+.underline{
+    text-decoration: underline;
+}
+
+.educationImage {
+    flex: 1;
+    width: 40rem;
+    transform: translateY(2rem);
+    max-width: 100%;
+    padding-right: 10rem;
+    height: auto;
+}
+
+.list{
+    padding-left: 2rem;
+    /*justify-content: left;*/
+}
+
+.imgDiv{
+    max-width: 30%;
+    justify-content: right;
+}
+
+#dropdownText{
+    color: white;
+    /*justify-content: left;*/
+    line-height: 3rem;
+}
+
+.paragraphText{
+    inline-size: auto;
+}

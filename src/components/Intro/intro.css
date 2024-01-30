@@ -1,0 +1,71 @@
+/* Comments are quite important on this file. It is hard to make it just perfect! */
+
+#intro {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 2rem;
+    text-align: left;
+}
+
+.introContent {
+    max-width: 75rem;
+    width: 100%;
+}
+
+.hello {
+    font-size: 2rem; /* Size of 'Welcome,' */
+    margin: 0 0 0.5rem 0; /* Margin and space below 'Welcome,' */
+    display: block; /* Puts 'Welcome,' on its own line */
+}
+
+.introText {
+    font-size: 5rem; /* Size for 'I'm' */
+    margin: 0; /* Removes margin */
+    font-weight: 700;
+    display: flex; /* Flex container - inline elements */
+    align-items: baseline; /* Aligns 'I'm' and my name on the baseline */
+}
+
+.introName {
+    color: yellow; /* Marco */
+    margin-left: 0.5rem; /* Smaller space after 'I'm' */
+    font-size: 5rem; /* Same size as 'I'm' to maintain consistency */
+}
+
+.introParagraph {
+    font-size: 2.5rem; /* Size of the description */
+    margin: 0.5rem 0 1rem 0; /* Space above and below the description */
+    font-weight: 300;
+}
+
+.socialLinks {
+    display: flex;
+    align-items: center;
+    margin-left: 1rem; /* Space to the left of the icons */
+}
+
+.socialIcon {
+    width: 3rem;
+    height: 3rem;
+    object-fit: contain;
+    margin-left: 1rem; /* Space between icons */
+}
+
+@media (max-width: 600px) {
+    .introContent {
+        font-size: 2.5rem; /* Font size for the title */
+    }
+    .introText {
+        flex-direction: column; /* Stack elements on small screens */
+        align-items: flex-start; /* Align items to the start */
+    }
+    .introParagraph {
+        font-size: 2rem; /* Adjusted font size for small screens */
+    }
+    .socialIcon {
+        width: 2.5rem; /* Smaller icons for smaller screens */
+        height: 2.5rem;
+    }
+}

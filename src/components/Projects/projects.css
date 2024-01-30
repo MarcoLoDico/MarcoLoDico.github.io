@@ -1,0 +1,60 @@
+.projectsContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+#projects {
+    display: flex;
+    align-items: center; /* Aligns items vertically in the center */
+    justify-content: flex-start; /* Aligns items to the start of the container */
+}
+
+.projectsText {
+    flex: 2;
+    font-size: 2rem;
+    text-align: center;
+    padding: 10rem 5rem 10rem 10rem;
+    max-width: 70%;
+}
+
+.shift{
+    margin-left: 2rem;
+}
+
+.underline{
+    text-decoration: underline;
+}
+
+/*.projectsImage {*/
+/*    flex: 1;*/
+/*    max-width: 30%;*/
+/*    max-height: 30%;*/
+/*    height: 50rem;*/
+/*    width: 10rem;*/
+/*    padding: 10rem;*/
+/*    border-radius: 50%;*/
+/*}*/
+
+.projectsImage {
+    flex: 1;
+    width: 40rem;
+    transform: translateY(2rem);
+    max-width: 100%;
+    padding-right: 10rem;
+    height: auto;
+}
+
+.list{
+    padding-left: 2rem;
+    /*justify-content: left;*/
+}
+
+#experienceLink{
+    color:lightblue;
+    font-style: italic;
+}
+
+.paragraphText{
+    inline-size: auto;
+}
