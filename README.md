@@ -4,7 +4,7 @@ Live at https://marcolodico.github.io/
 
 Addiitonal features I want to add:
 - Media Queries: Currently the website is not made for phones. I want to fix this.
-- Refactoring: I believe there is repetative CSS stlying because different sections have different classnames, even if they should just display the information in the same format as another section.
+- Refactoring: I believe there is repetative CSS stlying because different sections have different class names, even if they should just display the information in the same format as another section.
 
 This is my personal website, made with React. I used this project to teach myself React, as such, I followed some tutorials along the way.
 
