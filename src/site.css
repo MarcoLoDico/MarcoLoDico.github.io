@@ -76,11 +76,11 @@ a:focus-visible { outline: 2px solid var(--orange); outline-offset: 5px; }
 .header a:hover, .social-links a:hover { color: var(--orange); }
 
 .hero {
-  min-height: 570px;
+  min-height: clamp(440px, 60svh, 540px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 80px 0 70px;
+  padding: clamp(46px, 6svh, 68px) 0 clamp(46px, 6svh, 64px);
   border-bottom: 1px solid var(--ink);
 }
 .overline {
@@ -112,7 +112,7 @@ a:focus-visible { outline: 2px solid var(--orange); outline-offset: 5px; }
   grid-template-columns: 1fr auto;
   align-items: end;
   gap: 50px;
-  margin-top: 58px;
+  margin-top: clamp(40px, 5svh, 54px);
 }
 .hero-bottom > p {
   max-width: 760px;
@@ -125,12 +125,12 @@ a:focus-visible { outline: 2px solid var(--orange); outline-offset: 5px; }
 .social-links a { border-bottom: 1px solid var(--ink); padding-bottom: 4px; }
 
 .section-dark {
-  margin: 120px calc((100vw - min(1240px, calc(100vw - 56px))) / -2) 0;
-  padding: 110px calc((100vw - min(1240px, calc(100vw - 56px))) / 2) 120px;
+  margin: clamp(88px, 10svh, 112px) calc((100vw - min(1240px, calc(100vw - 56px))) / -2) 0;
+  padding: clamp(82px, 10svh, 106px) calc((100vw - min(1240px, calc(100vw - 56px))) / 2) clamp(88px, 11svh, 112px);
   background: var(--inverse);
   color: var(--inverse-text);
 }
-.section-light { padding: 120px 0; border-bottom: 1px solid var(--ink); }
+.section-light { padding: clamp(88px, 11svh, 112px) 0; border-bottom: 1px solid var(--ink); }
 .section-heading {
   margin-bottom: 72px;
   text-align: center;
@@ -260,7 +260,11 @@ footer p { margin: 0; }
   .header { height: 66px; }
   .header-actions { gap: 16px; }
   .header-socials { gap: 12px; }
-  .hero { min-height: calc(100vh - 66px); padding: 64px 0 48px; }
+  .hero {
+    min-height: 0;
+    justify-content: flex-start;
+    padding: 44px 0 52px;
+  }
   .hero h1 { font-size: clamp(44px, 13vw, 64px); }
   .hero h1 .greeting { margin-bottom: 12px; font-size: .55em; }
   .hero-bottom { grid-template-columns: 1fr; align-items: start; gap: 30px; margin-top: 48px; }
