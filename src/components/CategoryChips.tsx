@@ -1,8 +1,13 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { categories } from "../content/categories";
 import { places } from "../content/places";
 import type { CategoryId } from "../content/types";
+import { scrollChildIntoViewHorizontally } from "../lib/dom";
+import { prefersReducedMotion } from "../lib/motion";
 import "./CategoryChips.css";
+
+/** Keeps a revealed chip clear of the strip's edge so it doesn't look cut off. */
+const CHIP_EDGE_MARGIN = 10;
 
 interface CategoryChipsProps {
   readonly activeCategoryId: CategoryId | null;
@@ -14,8 +19,18 @@ const placeCounts: ReadonlyMap<CategoryId, number> = new Map(
 );
 
 export function CategoryChips({ activeCategoryId, onShowCategory }: CategoryChipsProps) {
+  const containerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const activeChip = container?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (container && activeChip) {
+      scrollChildIntoViewHorizontally(container, activeChip, CHIP_EDGE_MARGIN, prefersReducedMotion() ? "auto" : "smooth");
+    }
+  }, [activeCategoryId]);
+
   return (
-    <nav className="category-chips" aria-label="Filter the map by category">
+    <nav ref={containerRef} className="category-chips" aria-label="Filter the map by category">
       {categories.map((category) => {
         const Icon = category.icon;
         const isActive = category.id === activeCategoryId;

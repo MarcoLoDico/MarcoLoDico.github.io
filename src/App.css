@@ -27,6 +27,12 @@
   pointer-events: auto;
 }
 
+/* The results dropdown must cover the chips, which sit directly below the search on phones. */
+.topbar__search {
+  position: relative;
+  z-index: 1;
+}
+
 .topbar__actions {
   display: flex;
   align-items: center;

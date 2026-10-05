@@ -394,6 +394,11 @@
   height: 220px;
 }
 
+/* Short enough that the name and details stay visible in the half-open sheet. */
+.bottom-sheet .place-hero--photo {
+  height: 168px;
+}
+
 .place-hero--photo::after {
   display: none;
 }

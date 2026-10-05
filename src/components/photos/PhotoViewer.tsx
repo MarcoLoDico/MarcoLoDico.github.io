@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import type { Photo } from "../../content/types";
 import { IconButton } from "../IconButton";
 import { ResponsivePicture } from "./ResponsivePicture";
@@ -11,6 +11,8 @@ interface PhotoViewerProps {
   readonly index: number | null;
   readonly onIndexChange: (index: number | null) => void;
 }
+
+const SWIPE_THRESHOLD_PIXELS = 48;
 
 export function PhotoViewer({ photos, index, onIndexChange }: PhotoViewerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -49,6 +51,19 @@ export function PhotoViewer({ photos, index, onIndexChange }: PhotoViewerProps) 
     }
   };
 
+  const swipeStartX = useRef<number | null>(null);
+  const stepOnSwipe = (event: PointerEvent<HTMLElement>) => {
+    const startX = swipeStartX.current;
+    swipeStartX.current = null;
+    if (startX === null || !canStep) {
+      return;
+    }
+    const distance = event.clientX - startX;
+    if (Math.abs(distance) >= SWIPE_THRESHOLD_PIXELS) {
+      step(distance < 0 ? 1 : -1);
+    }
+  };
+
   return (
     <dialog
       ref={dialogRef}
@@ -60,7 +75,16 @@ export function PhotoViewer({ photos, index, onIndexChange }: PhotoViewerProps) 
     >
       {photo && index !== null && (
         <>
-          <figure className="photo-viewer__figure">
+          <figure
+            className="photo-viewer__figure"
+            onPointerDown={(event) => {
+              swipeStartX.current = event.clientX;
+            }}
+            onPointerUp={stepOnSwipe}
+            onPointerCancel={() => {
+              swipeStartX.current = null;
+            }}
+          >
             <ResponsivePicture
               picture={photo.picture}
               alt={photo.alt}

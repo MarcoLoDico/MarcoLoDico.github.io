@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Route, Share2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Share2 } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { getCategory } from "../../content/categories";
 import { places } from "../../content/places";
@@ -72,12 +72,6 @@ export function PlaceView({
             <CalendarDays size={14} aria-hidden="true" />
             {place.period}
           </li>
-          {place.trip && (
-            <li>
-              <Route size={14} aria-hidden="true" />
-              {place.trip.name} trip
-            </li>
-          )}
         </ul>
       </header>
 
