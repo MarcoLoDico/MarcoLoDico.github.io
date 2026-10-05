@@ -34,6 +34,11 @@ describe("createSearchIndex", () => {
     expect(first?.matchedTag).toBe("Supabase");
   });
 
+  it("finds travel stops by trip name and photo caption", () => {
+    expect(resultIds("sicily")).toContain("taormina");
+    expect(resultIds("teatro")).toEqual(["taormina"]);
+  });
+
   it("requires every word of the query to match", () => {
     expect(resultIds("flutter waterloo")).toEqual(["blindseer"]);
     expect(resultIds("flutter shopify")).toEqual([]);

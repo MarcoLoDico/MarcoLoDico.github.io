@@ -1,0 +1,125 @@
+.icon-button.icon-button--scrim {
+  background: rgba(15, 23, 42, 0.5);
+  color: #fff;
+  backdrop-filter: blur(10px);
+}
+
+.icon-button.icon-button--scrim:hover {
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+}
+
+/* ---- Viewer ---- */
+
+.photo-viewer {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(56px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  border: 0;
+  background: transparent;
+  color: #fff;
+}
+
+.photo-viewer[open] {
+  display: grid;
+  place-items: center;
+  animation: photo-viewer-in 220ms var(--ease-out);
+}
+
+.photo-viewer::backdrop {
+  background: rgba(4, 6, 13, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+.photo-viewer__figure {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.photo-viewer__picture img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 1600px);
+  height: auto;
+  max-height: calc(100dvh - 140px);
+  border-radius: var(--radius-medium);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  object-fit: contain;
+}
+
+.photo-viewer__caption {
+  display: flex;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+}
+
+.photo-viewer__count {
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.photo-viewer__close {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+}
+
+.photo-viewer__step {
+  position: fixed;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+.photo-viewer__step--previous {
+  left: 12px;
+}
+
+.photo-viewer__step--next {
+  right: 12px;
+}
+
+@keyframes photo-viewer-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+/* ---- Gallery in the place panel ---- */
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.photo-grid__item {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: var(--color-surface-muted);
+  aspect-ratio: 1;
+}
+
+.photo-grid__item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms var(--ease-out);
+}
+
+.photo-grid__item:hover img {
+  transform: scale(1.05);
+}

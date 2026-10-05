@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Code, GraduationCap, Trophy, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Code, GraduationCap, Plane, Trophy, type LucideIcon } from "lucide-react";
 import type { CategoryId } from "./types";
 
 export interface Category {
@@ -14,6 +14,7 @@ export const categories: readonly Category[] = [
   { id: "projects", label: "Projects", singular: "Project", color: "#9333ea", icon: Code },
   { id: "education", label: "Education", singular: "Education", color: "#059669", icon: GraduationCap },
   { id: "other-work", label: "Other work", singular: "Other work", color: "#ea580c", icon: Trophy },
+  { id: "travel", label: "Travel", singular: "Travel", color: "#0891b2", icon: Plane },
 ];
 
 const categoriesById: ReadonlyMap<CategoryId, Category> = new Map(

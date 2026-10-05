@@ -4,7 +4,16 @@
   background: var(--color-surface);
   box-shadow: var(--shadow-floating);
   backdrop-filter: var(--backdrop);
-  transition: border-radius 160ms ease;
+  transition:
+    border-radius 160ms ease,
+    box-shadow 160ms ease;
+}
+
+/* Focus is shown on the whole pill; while the dropdown is open it already frames the search. */
+.search:not(.search--open):focus-within {
+  box-shadow:
+    0 0 0 2px var(--color-focus),
+    var(--shadow-floating);
 }
 
 .search--open {
@@ -34,6 +43,9 @@
   border: 0;
   background: none;
   font-size: 15px;
+}
+
+.search__input:focus-visible {
   outline: none;
 }
 

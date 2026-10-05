@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { getCategory } from "../../content/categories";
 import { places } from "../../content/places";
 import type { CategoryId, Place } from "../../content/types";
+import { groupByTrip } from "../../lib/trips";
 import { CategoryBadge } from "../CategoryBadge";
 import { IconButton } from "../IconButton";
 import { PlaceListItem } from "./PlaceListItem";
@@ -32,17 +33,27 @@ export function CategoryView({ categoryId, hoveredPlaceId, onBack, onSelectPlace
           </p>
         </div>
       </header>
-      <ul className="place-list">
-        {categoryPlaces.map((place) => (
-          <PlaceListItem
-            key={place.id}
-            place={place}
-            highlighted={place.id === hoveredPlaceId}
-            onSelect={onSelectPlace}
-            onHover={onHoverPlace}
-          />
-        ))}
-      </ul>
+      {groupByTrip(categoryPlaces).map(({ trip, places: groupPlaces }) => (
+        <section key={trip?.id ?? "ungrouped"} className="trip-group" aria-label={trip?.name}>
+          {trip && (
+            <header className="trip-group__header">
+              <h2 className="trip-group__name">{trip.name}</h2>
+              <p className="trip-group__period">{trip.period}</p>
+            </header>
+          )}
+          <ul className="place-list">
+            {groupPlaces.map((place) => (
+              <PlaceListItem
+                key={place.id}
+                place={place}
+                highlighted={place.id === hoveredPlaceId}
+                onSelect={onSelectPlace}
+                onHover={onHoverPlace}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { Place } from "../../content/types";
 import { CategoryBadge } from "../CategoryBadge";
+import { ResponsivePicture } from "../photos/ResponsivePicture";
 
 interface PlaceListItemProps {
   readonly place: Place;
@@ -10,6 +11,7 @@ interface PlaceListItemProps {
 }
 
 export function PlaceListItem({ place, highlighted, onSelect, onHover }: PlaceListItemProps) {
+  const cover = place.photos?.[0];
   return (
     <li>
       <button
@@ -21,7 +23,11 @@ export function PlaceListItem({ place, highlighted, onSelect, onHover }: PlaceLi
         onFocus={() => onHover(place.id)}
         onBlur={() => onHover(null)}
       >
-        <CategoryBadge categoryId={place.category} size="large" />
+        {cover ? (
+          <ResponsivePicture picture={cover.picture} alt="" sizes="44px" className="place-item__thumb" />
+        ) : (
+          <CategoryBadge categoryId={place.category} size="large" />
+        )}
         <span className="place-item__text">
           <span className="place-item__name">{place.name}</span>
           <span className="place-item__subtitle">{place.subtitle}</span>

@@ -1,10 +1,13 @@
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Share2 } from "lucide-react";
-import type { CSSProperties } from "react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Route, Share2 } from "lucide-react";
+import { useState, type CSSProperties } from "react";
 import { getCategory } from "../../content/categories";
 import { places } from "../../content/places";
 import type { Highlight, Place, PlaceSection } from "../../content/types";
+import { placesOnSameTrip } from "../../lib/trips";
 import { CategoryBadge } from "../CategoryBadge";
 import { IconButton } from "../IconButton";
+import { PhotoViewer } from "../photos/PhotoViewer";
+import { ResponsivePicture } from "../photos/ResponsivePicture";
 import { PlaceListItem } from "./PlaceListItem";
 
 interface PlaceViewProps {
@@ -28,12 +31,29 @@ export function PlaceView({
 }: PlaceViewProps) {
   const category = getCategory(place.category);
   const style: CSSProperties = { "--category-color": category.color };
-  const neighbours = places.filter((other) => other.site.id === place.site.id && other.id !== place.id);
+  const photos = place.photos ?? [];
+  const cover = photos[0];
+  const [viewedPhotoIndex, setViewedPhotoIndex] = useState<number | null>(null);
+  const related = relatedPlaces(place);
 
   return (
     <article className="panel-view place-view" style={style}>
-      <div className="place-hero">
-        <IconButton label={backLabel} onClick={onBack} className="place-hero__back icon-button--glass">
+      <div className={cover ? "place-hero place-hero--photo" : "place-hero"}>
+        {cover && (
+          <button
+            type="button"
+            className="place-hero__cover"
+            aria-label={`View photos of ${place.name}`}
+            onClick={() => setViewedPhotoIndex(0)}
+          >
+            <ResponsivePicture picture={cover.picture} alt={cover.alt} sizes="400px" loading="eager" />
+          </button>
+        )}
+        <IconButton
+          label={backLabel}
+          onClick={onBack}
+          className={`place-hero__back ${cover ? "icon-button--scrim" : "icon-button--glass"}`}
+        >
           <ArrowLeft size={18} />
         </IconButton>
         <CategoryBadge categoryId={place.category} size="large" />
@@ -52,6 +72,12 @@ export function PlaceView({
             <CalendarDays size={14} aria-hidden="true" />
             {place.period}
           </li>
+          {place.trip && (
+            <li>
+              <Route size={14} aria-hidden="true" />
+              {place.trip.name} trip
+            </li>
+          )}
         </ul>
       </header>
 
@@ -76,6 +102,28 @@ export function PlaceView({
 
       <p className="place-view__summary">{place.summary}</p>
 
+      {photos.length > 1 && (
+        <section className="panel-section" aria-labelledby="photos-heading">
+          <h2 id="photos-heading" className="panel-section__title">
+            Photos
+          </h2>
+          <ul className="photo-grid">
+            {photos.map((photo, index) => (
+              <li key={photo.picture.img.src}>
+                <button
+                  type="button"
+                  className="photo-grid__item"
+                  aria-label={`View photo: ${photo.caption ?? photo.alt}`}
+                  onClick={() => setViewedPhotoIndex(index)}
+                >
+                  <ResponsivePicture picture={photo.picture} alt="" sizes="130px" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {place.sections.map((section, index) => (
         <PlaceSectionView key={`${section.kind}-${index}`} section={section} />
       ))}
@@ -92,17 +140,17 @@ export function PlaceView({
         </section>
       )}
 
-      {neighbours.length > 0 && (
-        <section className="panel-section" aria-labelledby="nearby-heading">
-          <h2 id="nearby-heading" className="panel-section__title">
-            Also here
+      {related.places.length > 0 && (
+        <section className="panel-section" aria-labelledby="related-heading">
+          <h2 id="related-heading" className="panel-section__title">
+            {related.title}
           </h2>
           <ul className="place-list">
-            {neighbours.map((neighbour) => (
+            {related.places.map((relatedPlace) => (
               <PlaceListItem
-                key={neighbour.id}
-                place={neighbour}
-                highlighted={neighbour.id === hoveredPlaceId}
+                key={relatedPlace.id}
+                place={relatedPlace}
+                highlighted={relatedPlace.id === hoveredPlaceId}
                 onSelect={onSelectPlace}
                 onHover={onHoverPlace}
               />
@@ -110,8 +158,18 @@ export function PlaceView({
           </ul>
         </section>
       )}
+
+      <PhotoViewer photos={photos} index={viewedPhotoIndex} onIndexChange={setViewedPhotoIndex} />
     </article>
   );
+}
+
+/** Stops on the same trip for travel, otherwise whatever else shares the place's site. */
+function relatedPlaces(place: Place): { readonly title: string; readonly places: readonly Place[] } {
+  if (place.trip) {
+    return { title: `More from ${place.trip.name}`, places: placesOnSameTrip(place, places) };
+  }
+  return { title: "Also here", places: places.filter((other) => other.site.id === place.site.id && other.id !== place.id) };
 }
 
 function PlaceSectionView({ section }: { readonly section: PlaceSection }) {

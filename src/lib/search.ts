@@ -56,7 +56,9 @@ function sectionText(section: PlaceSection): string[] {
 }
 
 function indexPlace(place: Place): IndexedPlace {
-  const body = [place.summary, ...place.sections.flatMap(sectionText)].join(" ");
+  const captions = (place.photos ?? []).flatMap((photo) => photo.caption ?? []);
+  const body = [place.summary, ...place.sections.flatMap(sectionText), ...captions].join(" ");
+  const location = [place.site.label, place.trip?.name ?? ""].join(" ");
   const normalizedTags = place.tags.map(normalize);
 
   return {
@@ -67,7 +69,7 @@ function indexPlace(place: Place): IndexedPlace {
       { text: normalize(place.subtitle), weight: FIELD_WEIGHTS.subtitle },
       { text: normalize(getCategory(place.category).label), weight: FIELD_WEIGHTS.category },
       ...normalizedTags.map((tag) => ({ text: tag, weight: FIELD_WEIGHTS.tag })),
-      { text: normalize(place.site.label), weight: FIELD_WEIGHTS.location },
+      { text: normalize(location), weight: FIELD_WEIGHTS.location },
       { text: normalize(body), weight: FIELD_WEIGHTS.body },
     ],
   };

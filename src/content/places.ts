@@ -1,4 +1,11 @@
+import { travels } from "./travels";
 import type { Place, Site } from "./types";
+
+const ontarioChamberOfCommerce: Site = {
+  id: "ontario-chamber-of-commerce",
+  label: "180 Dundas St. W, Toronto, Ontario",
+  coordinates: [-79.3867, 43.6555],
+};
 
 const toronto: Site = {
   id: "toronto",
@@ -108,7 +115,7 @@ export const places: readonly Place[] = [
     name: "Ontario Chamber of Commerce",
     subtitle: "Small Business Digital Advisor",
     period: "May — Aug. 2024",
-    site: toronto,
+    site: ontarioChamberOfCommerce,
     summary: "Supported Skills Bridge, a digital training platform for Ontario small businesses.",
     sections: [
       {
@@ -272,6 +279,7 @@ export const places: readonly Place[] = [
     tags: ["Officiating", "Hockey", "Leadership"],
     links: [],
   },
+  ...travels,
 ];
 
 export function findPlace(id: string): Place | undefined {

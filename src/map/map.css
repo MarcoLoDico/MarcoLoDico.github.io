@@ -78,6 +78,28 @@
   transform: rotate(45deg);
 }
 
+.place-pin--photo .place-pin__head {
+  overflow: hidden;
+  width: 42px;
+  height: 42px;
+  border-width: 3px;
+}
+
+.place-pin__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Counter-rotated and scaled up so the photo fills the rotated teardrop's corners. */
+.place-pin__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: rotate(45deg) scale(1.42);
+}
+
 .place-pin__shadow {
   width: 10px;
   height: 4px;
