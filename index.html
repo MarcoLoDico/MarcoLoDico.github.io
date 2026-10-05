@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f3ef" />
+    <meta
+      name="description"
+      content="Marco Lo Dico is a software engineering student at the University of Waterloo and a previous Shopify intern. Explore his experience, projects, and education on an interactive globe."
+    />
+    <meta property="og:title" content="Marco Lo Dico — Software Engineer" />
+    <meta
+      property="og:description"
+      content="Production infrastructure, backend systems, and product engineering, mapped on an interactive globe."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+    <title>Marco Lo Dico — Software Engineer</title>
+    <script>
+      (function () {
+        var colors = { light: "#f4f3ef", dark: "#0b0d12" };
+        var theme = "light";
+        try {
+          theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        } catch (error) {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", colors[theme] || colors.light);
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>Marco Lo Dico — Software Engineering at the University of Waterloo. This interactive map needs JavaScript.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

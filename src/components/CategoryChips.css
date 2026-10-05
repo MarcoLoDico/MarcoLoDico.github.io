@@ -1,0 +1,73 @@
+.category-chips {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.category-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px 0 11px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: var(--backdrop);
+  font-size: 14px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.category-chip svg {
+  color: var(--category-color);
+  transition: color 160ms ease;
+}
+
+.category-chip:hover {
+  background: var(--color-surface-solid);
+}
+
+.category-chip:active {
+  transform: scale(0.96);
+}
+
+.category-chip__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.category-chip--active,
+.category-chip--active:hover {
+  background: var(--category-color);
+  color: #fff;
+}
+
+.category-chip--active svg {
+  color: #fff;
+}
+
+.category-chip--active .category-chip__count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}

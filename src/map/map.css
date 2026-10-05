@@ -1,0 +1,260 @@
+.map-view {
+  position: absolute;
+  inset: 0;
+  background: var(--space-background);
+}
+
+.map-view__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-view__canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 72% 12%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 38% 74%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 88% 62%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 22% 88%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 58% 36%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 92% 90%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 6% 52%, rgba(255, 255, 255, 0.55), transparent);
+  background-size: 420px 420px;
+  pointer-events: none;
+}
+
+.map-view .maplibregl-canvas {
+  outline: none;
+}
+
+.map-marker--elevated {
+  z-index: 3;
+}
+
+/* ---- Place pin ---- */
+
+.place-pin {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  animation: pin-drop 420ms var(--ease-spring) both;
+}
+
+.place-pin__body {
+  display: grid;
+  justify-items: center;
+  transform-origin: 50% 100%;
+  transition: transform 220ms var(--ease-spring);
+}
+
+.place-pin:hover .place-pin__body,
+.place-pin--highlighted .place-pin__body {
+  transform: scale(1.12);
+}
+
+.place-pin--selected .place-pin__body {
+  transform: scale(1.3);
+}
+
+.place-pin__head {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2.5px solid #fff;
+  border-radius: 50% 50% 50% 4px;
+  background: var(--category-color);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.32);
+  transform: rotate(-45deg);
+}
+
+.place-pin__head svg {
+  transform: rotate(45deg);
+}
+
+.place-pin__shadow {
+  width: 10px;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.place-pin--selected .place-pin__shadow {
+  animation: pin-pulse 1.8s ease-out infinite;
+}
+
+.place-pin__label {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  box-shadow: var(--shadow-floating);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 4px) scale(0.92);
+  transition:
+    opacity 160ms ease,
+    transform 200ms var(--ease-out);
+  pointer-events: none;
+}
+
+.place-pin:hover .place-pin__label,
+.place-pin:focus-visible .place-pin__label,
+.place-pin--highlighted .place-pin__label,
+.place-pin--selected .place-pin__label {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.place-pin--selected .place-pin__label {
+  bottom: calc(100% + 18px);
+}
+
+.place-pin:focus-visible {
+  outline: none;
+}
+
+.place-pin:focus-visible .place-pin__head {
+  box-shadow:
+    0 0 0 3px var(--color-focus),
+    0 6px 14px rgba(15, 23, 42, 0.32);
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.6);
+  }
+}
+
+@keyframes pin-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--category-color) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 18px transparent;
+  }
+}
+
+/* ---- Cluster pin ---- */
+
+.cluster-pin {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cluster-ring);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.3);
+  transition: transform 200ms var(--ease-spring);
+  animation: cluster-in 360ms var(--ease-spring) both;
+}
+
+.cluster-pin:hover {
+  transform: scale(1.1);
+}
+
+.cluster-pin__count {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes cluster-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+/* ---- Controls ---- */
+
+.map-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 40px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app--compact .map-controls {
+  right: 10px;
+  top: 128px;
+  bottom: auto;
+}
+
+.app--compact .map-controls__group:last-child {
+  display: none;
+}
+
+.map-controls__group {
+  display: flex;
+  flex-direction: column;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: var(--backdrop);
+}
+
+.map-controls__group .icon-button {
+  width: 38px;
+  height: 38px;
+  color: var(--color-text);
+}
+
+.map-controls__compass {
+  color: #ef4444;
+  transition: transform 80ms linear;
+}
+
+/* ---- MapLibre chrome ---- */
+
+.map-view .maplibregl-ctrl-bottom-right {
+  z-index: 5;
+}
+
+.map-view .maplibregl-ctrl-attrib {
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.map-view .maplibregl-ctrl-attrib a {
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme="dark"] .map-view .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+.app--compact .map-view .maplibregl-ctrl-bottom-right {
+  top: 112px;
+  right: auto;
+  bottom: auto;
+  left: 0;
+}
