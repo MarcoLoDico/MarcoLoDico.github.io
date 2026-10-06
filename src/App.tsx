@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { CategoryChips } from "./components/CategoryChips";
 import {
   BottomSheet,
@@ -16,6 +16,7 @@ import { getCategory } from "./content/categories";
 import { findPlace } from "./content/places";
 import { profile } from "./content/profile";
 import type { CategoryId, Place } from "./content/types";
+import { useElementBottom } from "./hooks/useElementBottom";
 import { useExplorer } from "./hooks/useExplorer";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useTheme } from "./hooks/useTheme";
@@ -29,22 +30,27 @@ import "./App.css";
 const MapView = lazy(() => import("./map/MapView").then((module) => ({ default: module.MapView })));
 
 const COMPACT_LAYOUT_QUERY = "(max-width: 760px)";
-const DESKTOP_TOP_INSET = 72;
-const COMPACT_TOP_INSET = 120;
+const BELOW_TOPBAR_GAP = 8;
 const CONTROLS_INSET = 64;
 const EDGE_INSET = 16;
 
-function mapPaddingFor(isCompact: boolean, isSidebarOpen: boolean, sheetSnap: SheetSnap): MapPadding {
+function mapPaddingFor(
+  isCompact: boolean,
+  isSidebarOpen: boolean,
+  sheetSnap: SheetSnap,
+  topbarBottom: number,
+): MapPadding {
+  const top = topbarBottom + BELOW_TOPBAR_GAP;
   if (isCompact) {
     return {
-      top: COMPACT_TOP_INSET,
+      top,
       right: CONTROLS_INSET,
       bottom: sheetSnap === "collapsed" ? SHEET_COLLAPSED_HEIGHT : SHEET_PEEK_HEIGHT,
       left: EDGE_INSET,
     };
   }
   return {
-    top: DESKTOP_TOP_INSET,
+    top,
     right: CONTROLS_INSET,
     bottom: EDGE_INSET,
     left: isSidebarOpen ? SIDEBAR_FOOTPRINT : EDGE_INSET,
@@ -70,12 +76,15 @@ export function App() {
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>("peek");
+  const topbarRef = useRef<HTMLElement>(null);
+  const topbarBottom = useElementBottom(topbarRef);
 
   const visiblePlaces = useMemo(() => placesInCategory(explorer.categoryId), [explorer.categoryId]);
   const padding = useMemo(
-    () => mapPaddingFor(isCompact, isSidebarOpen, sheetSnap),
-    [isCompact, isSidebarOpen, sheetSnap],
+    () => mapPaddingFor(isCompact, isSidebarOpen, sheetSnap, topbarBottom),
+    [isCompact, isSidebarOpen, sheetSnap, topbarBottom],
   );
+  const layoutStyle: CSSProperties = { "--topbar-bottom": `${topbarBottom}px` };
 
   const revealPanel = useCallback(() => {
     setIsSidebarOpen(true);
@@ -154,7 +163,7 @@ export function App() {
   );
 
   return (
-    <div className={isCompact ? "app app--compact" : "app"}>
+    <div className={isCompact ? "app app--compact" : "app"} style={layoutStyle}>
       <Suspense fallback={<div className="map-placeholder" aria-hidden="true" />}>
         <MapView
           explorer={explorer}
@@ -167,7 +176,7 @@ export function App() {
         />
       </Suspense>
 
-      <header className="topbar">
+      <header ref={topbarRef} className="topbar">
         <div className="topbar__search">
           <SearchBox onSelectPlace={selectPlace} onShowCategory={showCategory} onShowSkills={showSkills} />
         </div>

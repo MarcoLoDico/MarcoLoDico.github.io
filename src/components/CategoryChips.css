@@ -1,8 +1,13 @@
+/*
+ * A horizontal scroller clips vertically too, so the padding must contain the
+ * chips' whole shadow; the negative margin keeps the strip's layout footprint.
+ */
 .category-chips {
   display: flex;
   gap: 8px;
   min-width: 0;
-  padding: 6px 2px;
+  margin: -4px -8px;
+  padding: 10px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -21,7 +26,7 @@
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-chip);
   backdrop-filter: var(--backdrop);
   font-size: 14px;
   font-weight: 550;

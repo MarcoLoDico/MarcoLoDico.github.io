@@ -5,5 +5,6 @@ declare module "react" {
     "--category-color"?: string;
     "--cluster-ring"?: string;
     "--sheet-visible"?: string;
+    "--topbar-bottom"?: string;
   }
 }

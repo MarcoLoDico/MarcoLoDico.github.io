@@ -224,7 +224,7 @@
 
 .app--compact .map-controls {
   right: 10px;
-  top: 128px;
+  top: calc(var(--topbar-bottom) + 12px);
   bottom: auto;
 }
 
@@ -275,7 +275,7 @@
 }
 
 .app--compact .map-view .maplibregl-ctrl-bottom-right {
-  top: 112px;
+  top: calc(var(--topbar-bottom) - 4px);
   right: auto;
   bottom: auto;
   left: 0;

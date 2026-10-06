@@ -2,7 +2,7 @@
 
 .sidebar {
   position: absolute;
-  top: 76px;
+  top: calc(var(--topbar-bottom) + 12px);
   bottom: 16px;
   left: 16px;
   z-index: 15;
@@ -18,13 +18,19 @@
   transform: translateX(calc(-100% - 16px));
 }
 
+/* Rounded corners don't clip a scroller's own scrollbar; clip-path does, so it can't poke past the corner. */
+.sidebar__content,
+.bottom-sheet__content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
 .sidebar__content {
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
   border-radius: inherit;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-strong) transparent;
+  clip-path: inset(0 round var(--radius-large));
 }
 
 .sidebar__toggle {
@@ -59,7 +65,8 @@
   z-index: 15;
   display: flex;
   flex-direction: column;
-  height: calc(100% - max(70px, env(safe-area-inset-top) + 60px));
+  /* Fully expanded, the sheet stops just below the search and chips so its handle stays reachable. */
+  height: calc(100% - var(--topbar-bottom) - 10px);
   border-radius: var(--radius-large) var(--radius-large) 0 0;
   background: var(--color-surface-solid);
   box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
