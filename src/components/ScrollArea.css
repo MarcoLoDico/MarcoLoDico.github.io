@@ -1,0 +1,49 @@
+.scroll-area {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scroll-area__viewport {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.scroll-area__viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-area__viewport--locked {
+  overflow: hidden;
+}
+
+.scroll-area__track {
+  position: absolute;
+  top: var(--scroll-area-inset-top, 8px);
+  right: 2px;
+  bottom: var(--scroll-area-inset-bottom, 8px);
+  width: 10px;
+}
+
+.scroll-area__track--idle,
+.scroll-area__viewport--locked + .scroll-area__track {
+  visibility: hidden;
+}
+
+.scroll-area__thumb {
+  width: 100%;
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  background-clip: padding-box;
+  touch-action: none;
+  transition: border-width 150ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+
+.scroll-area__track:hover .scroll-area__thumb,
+.scroll-area__thumb:active {
+  border-width: 2px;
+  background-color: var(--color-text-tertiary);
+}

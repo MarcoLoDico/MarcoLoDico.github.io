@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { ScrollArea } from "../ScrollArea";
 
 export type SheetSnap = "collapsed" | "peek" | "expanded";
 
@@ -132,9 +133,9 @@ export function BottomSheet({ snap, onSnapChange, label, contentKey, children }:
       >
         <span className="bottom-sheet__grip" />
       </div>
-      <div key={contentKey} className="bottom-sheet__content">
+      <ScrollArea key={contentKey} className="bottom-sheet__content" isLocked={snap === "collapsed"}>
         {children}
-      </div>
+      </ScrollArea>
     </section>
   );
 }

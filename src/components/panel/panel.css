@@ -18,19 +18,11 @@
   transform: translateX(calc(-100% - 16px));
 }
 
-/* Rounded corners don't clip a scroller's own scrollbar; clip-path does, so it can't poke past the corner. */
-.sidebar__content,
-.bottom-sheet__content {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-strong) transparent;
-}
-
 .sidebar__content {
+  --scroll-area-inset-top: var(--radius-large);
+  --scroll-area-inset-bottom: var(--radius-large);
   height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   border-radius: inherit;
-  clip-path: inset(0 round var(--radius-large));
 }
 
 .sidebar__toggle {
@@ -96,14 +88,12 @@
 }
 
 .bottom-sheet__content {
+  --scroll-area-inset-bottom: calc(8px + env(safe-area-inset-bottom));
   flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.bottom-sheet--collapsed .bottom-sheet__content {
-  overflow: hidden;
+.bottom-sheet__content .scroll-area__content {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .bottom-sheet .place-hero {

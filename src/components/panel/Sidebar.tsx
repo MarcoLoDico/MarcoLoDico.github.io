@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { ScrollArea } from "../ScrollArea";
 
 export const SIDEBAR_FOOTPRINT = 432;
 
@@ -15,9 +16,9 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onToggle, label, contentKey, children }: SidebarProps) {
   return (
     <aside className={isOpen ? "sidebar" : "sidebar sidebar--closed"} aria-label={label}>
-      <div key={contentKey} className="sidebar__content" inert={!isOpen}>
+      <ScrollArea key={contentKey} className="sidebar__content" inert={!isOpen}>
         {children}
-      </div>
+      </ScrollArea>
       <button
         type="button"
         className="sidebar__toggle"
