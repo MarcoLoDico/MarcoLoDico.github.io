@@ -394,13 +394,15 @@ def build_lining():
                 below = clip_at_height(quad, WINDSHIELD_SILL, False)
                 if len(below) >= 3:
                     face = part.bm.faces.new([part.bm.verts.new(P(*p)) for p in below])
-                    part._tag([face], M["glare"])
+                    part._tag([face], M["glare"] if band == 4 else M["frame"])
                 continue
             j = (i + 1) % n
             k = mirror(i)
             y = (rings[band][i][1] + rings[band][j][1] + rings[band + 1][i][1] + rings[band + 1][j][1]) / 4
-            if band == 4 or (band == 5 and y < 0.42):
-                mat = M["glare"]  # the dash cheeks, continuous with the glareshield
+            if band == 4:
+                mat = M["glare"]  # under the glareshield, ahead of the panel
+            elif band == 5 and y < 0.42:
+                mat = M["wall_low"]  # the kick panel ahead of the door
             elif band <= 6 or (band == 8 and y > 0.3):
                 mat = M["frame"]  # A- and B-pillars
             elif k in (0, 1) or y > 0.95:
@@ -433,7 +435,8 @@ def build_lining():
 # ---------------------------------------------------------------------------
 
 PANEL_Z = -0.86
-YOKE_Y = 0.19
+# The yokes come out of the panel below the bottom row of instruments.
+YOKE_Y = 0.105
 PANEL_BOTTOM = -0.06
 # The cabin wall is about 0.52 m out at panel height, so the panel runs right to it.
 PANEL_HALF_WIDTH = 0.5
@@ -459,7 +462,7 @@ GAUGES = {
     "suction": (-0.462, 0.23, 0.021),
     "ammeter": (-0.462, 0.15, 0.021),
 }
-RECT_GAUGES = {"engine": (-0.215, 0.115, 0.046), "fuel": (0.355, 0.345, 0.046)}
+RECT_GAUGES = {"engine": (-0.15, 0.125, 0.04), "fuel": (0.355, 0.345, 0.046)}
 
 
 def build_panel():
@@ -497,12 +500,6 @@ def build_panel():
     panel.rotation_euler = (math.radians(90), 0, 0)
     panel.location = P(0, 0, PANEL_Z - 0.009)
 
-    # Trim strips where the panel meets the cabin walls, tucked into them so there's no gap.
-    part = Part("panel_trim")
-    for side in (-1, 1):
-        x = side * (edge + 0.02)
-        part.box((x, (PANEL_BOTTOM + panel_top(edge)) / 2, PANEL_Z - 0.005), (0.045, panel_top(edge) - PANEL_BOTTOM, 0.03), M["panel_edge"])
-    part.finish(recalc=True, modifiers=[bevel(0.004, 2, 40)])
     return panel
 
 
@@ -575,8 +572,8 @@ def build_panel_fittings():
         x = 0.25 + i * 0.024
         part.cylinder((x, -0.03, front - 0.002), (x, -0.03, front + 0.01), 0.006, M["knob_black"], sides=10)
     # Glovebox with a chrome latch.
-    part.box((0.38, 0.06, front), (0.24, 0.11, 0.006), M["panel_edge"])
-    part.box((0.38, 0.1, front + 0.006), (0.05, 0.012, 0.006), M["chrome"])
+    part.box((0.405, 0.06, front), (0.17, 0.1, 0.006), M["panel_edge"])
+    part.box((0.405, 0.095, front + 0.006), (0.05, 0.012, 0.006), M["chrome"])
     # Hobbs meter, ELT switch, and the operating-limitations placard.
     part.box((0.45, 0.345, front), (0.05, 0.022, 0.006), M["screen"])
     part.box((0.45, 0.28, front + 0.002), (0.03, 0.03, 0.01), M["switch_red"])
@@ -645,21 +642,21 @@ def build_glareshield():
         (top - 0.04, -1.29),
         (top - 0.04, PANEL_Z - 0.06),
     ]
-    xs = [-0.55 + i * 0.55 / 8 for i in range(17)]
+    xs = [-PANEL_HALF_WIDTH + i * PANEL_HALF_WIDTH / 8 for i in range(17)]
     rings = []
     for x in xs:
         drop = top - panel_top(min(abs(x), PANEL_HALF_WIDTH))
         rings.append([P(x, y - drop, z) for y, z in profile])
     # Loft across x: build as rings along the x axis.
     part.loft(rings, M["glare"], closed=True, caps=True)
-    shield = part.finish(smooth_angle=50, modifiers=[subsurf(1)])
+    shield = part.finish(smooth_angle=50)
 
     # Piping along the lip, with a row of stitches just above it.
     piping = Part("glareshield_piping")
     def lip(x, dy=0.0, dz=0.0):
         drop = top - panel_top(min(abs(x), PANEL_HALF_WIDTH))
         return (x, top + 0.006 - drop + dy, PANEL_Z + 0.022 + dz)
-    xs_fine = [-0.53 + i * 1.06 / 60 for i in range(61)]
+    xs_fine = [-PANEL_HALF_WIDTH + 0.01 + i * (2 * PANEL_HALF_WIDTH - 0.02) / 60 for i in range(61)]
     for a, b in zip(xs_fine, xs_fine[1:]):
         piping.cylinder(lip(a), lip(b), 0.0045, M["piping"], sides=8)
     for k in range(0, 60, 2):
@@ -864,7 +861,7 @@ build_compass()
 build_knob("throttle", 0.0, M["knob_black"], 0.017, False)
 build_knob("mixture", 0.055, M["knob_red"], 0.014, True)
 build_flap_lever()
-build_yoke("yoke_left", -0.27, with_hands=True)
+build_yoke("yoke_left", -0.27)
 build_yoke("yoke_right", 0.27)
 build_pedestal()
 build_trim_wheel()

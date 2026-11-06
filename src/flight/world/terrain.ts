@@ -40,6 +40,43 @@ export interface Obstacle {
   readonly lon: number;
   readonly radius: number;
   readonly top: number;
+  /** Footprint as (east, north) metre offsets from lat/lon, flattened. */
+  readonly footprint: Float32Array;
+}
+
+/** Whether a point (metres east/north of an obstacle's centre) is inside its footprint. */
+export function insideFootprint(obstacle: Obstacle, east: number, north: number): boolean {
+  const f = obstacle.footprint;
+  const n = f.length / 2;
+  let inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = f[i * 2] ?? 0;
+    const yi = f[i * 2 + 1] ?? 0;
+    const xj = f[j * 2] ?? 0;
+    const yj = f[j * 2 + 1] ?? 0;
+    if (yi > north !== yj > north && east < ((xj - xi) * (north - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Pulls a material's fragments slightly toward the camera in the logarithmic
+ * depth buffer: by a fixed fraction of their distance, so the nudge is
+ * millimetres up close and metres on the horizon, always enough to win.
+ */
+function depthNudged<T extends MeshLambertMaterial>(material: T, factor: number): T {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <logdepthbuf_fragment>",
+      `#if defined( USE_LOGARITHMIC_DEPTH_BUFFER )
+        gl_FragDepth = vIsPerspective == 0.0 ? gl_FragCoord.z : log2( vFragDepth * ${factor.toFixed(5)} ) * logDepthBufFC * 0.5;
+      #endif`,
+    );
+  };
+  material.customProgramCacheKey = () => `depth-nudge-${factor}`;
+  return material;
 }
 
 /**
@@ -54,6 +91,10 @@ export class Terrain {
   private readonly entries = new Map<string, TileEntry>();
   private readonly byId = new Map<number, TileEntry>();
   private readonly material = new MeshLambertMaterial({ vertexColors: true });
+  // Paving and markings sit flush on the ground and win the depth test by a
+  // relative nudge, so they never flicker at any distance.
+  private readonly pavingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.9995);
+  private readonly markingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.999);
   private nextId = 1;
   private frameCounter = 0;
   private frame: LocalFrame;
@@ -77,6 +118,8 @@ export class Terrain {
       entry.mesh?.geometry.dispose();
     }
     this.material.dispose();
+    this.pavingMaterial.dispose();
+    this.markingMaterial.dispose();
     this.entries.clear();
   }
 
@@ -213,8 +256,16 @@ export class Terrain {
         if (!list) {
           continue;
         }
-        for (let k = 0; k + 3 < list.length; k += 4) {
-          yield { lat: list[k] ?? 0, lon: list[k + 1] ?? 0, radius: list[k + 2] ?? 0, top: list[k + 3] ?? 0 };
+        for (let k = 0; k < list.length; ) {
+          const count = list[k] ?? 0;
+          yield {
+            top: list[k + 1] ?? 0,
+            lat: list[k + 2] ?? 0,
+            lon: list[k + 3] ?? 0,
+            radius: list[k + 4] ?? 0,
+            footprint: list.subarray(k + 5, k + 5 + count * 2),
+          };
+          k += 5 + count * 2;
         }
       }
     }
@@ -330,7 +381,11 @@ export class Terrain {
     geometry.setAttribute("normal", new BufferAttribute(built.normals, 3, true));
     geometry.setAttribute("color", new BufferAttribute(built.colors, 3, true));
     geometry.computeBoundingSphere();
-    const mesh = new Mesh(geometry, this.material);
+    const vertexCount = built.positions.length / 3;
+    geometry.addGroup(0, built.pavingStart, 0);
+    geometry.addGroup(built.pavingStart, built.markingStart - built.pavingStart, 1);
+    geometry.addGroup(built.markingStart, vertexCount - built.markingStart, 2);
+    const mesh = new Mesh(geometry, [this.material, this.pavingMaterial, this.markingMaterial]);
     mesh.matrixAutoUpdate = false;
     mesh.receiveShadow = true;
     mesh.visible = false;

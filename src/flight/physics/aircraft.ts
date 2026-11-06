@@ -183,11 +183,12 @@ export class Aircraft {
     const { wingArea: S, wingSpan: b, chord: c, lift, drag } = C172;
 
     // Propwash speeds up the air over the tail (momentum theory: q rises by
-    // T/A in the slipstream, about half of which washes the tail), so the
-    // rudder and elevator work on the ground and at low speed with power.
+    // T/A in the fully developed slipstream; the tail sits partly in it), so
+    // the rudder and elevator still work on the ground with power, without
+    // making the nose easy to over-rotate at low speed.
     const diskArea = Math.PI * (C172.engine.propDiameter / 2) ** 2;
     const qbar = 0.5 * rho * speed * speed;
-    const tailQ = qbar + (0.45 * this.thrust) / diskArea;
+    const tailQ = qbar + (0.14 * this.thrust) / diskArea;
     const elevatorRad = this.elevator >= 0 ? -this.elevator * C172.elevatorUp : -this.elevator * C172.elevatorDown;
     const aileronRad = this.aileron * C172.aileronThrow;
     const rudderRad = -this.rudder * C172.rudderThrow;

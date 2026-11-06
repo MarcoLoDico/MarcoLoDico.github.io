@@ -14,6 +14,16 @@ const RUDDER_RATE = 3.5;
 const LOOK_SENSITIVITY = 0.0035;
 /** Cursor mode: the yoke reaches full travel this fraction of the screen from the middle. */
 const CURSOR_REACH = 0.36;
+/**
+ * Yoke response curve: mostly cubic near centre so small mouse movements make
+ * small corrections, reaching full deflection at the stops (like sim "expo").
+ */
+const EXPO = 0.6;
+
+export function shapeYoke(position: number): number {
+  return (1 - EXPO) * position + EXPO * position ** 3;
+}
+
 /** How long to wait for the browser to grant pointer lock before falling back to cursor mode. */
 const LOCK_GRACE_MS = 700;
 
@@ -21,6 +31,9 @@ export type InputAction = "toggle-view" | "pause" | "restart" | "warp" | "help" 
 
 export class FlightInput {
   readonly controls: ControlInputs = { elevator: 0, aileron: 0, rudder: 0, throttle: 0, flapNotch: 0, brake: 0 };
+  /** Raw yoke position from the mouse, before the response curve. */
+  private yokeX = 0;
+  private yokeY = 0;
   /** Free-look offsets in radians while Space is held. */
   lookYaw = 0;
   lookPitch = 0;
@@ -147,17 +160,19 @@ export class FlightInput {
     // Arrow keys nudge the yoke for anyone without a mouse.
     const nudge = 1.2 * dt;
     if (this.held.has("ArrowUp")) {
-      c.elevator = Math.max(-1, c.elevator - nudge);
+      this.yokeY = Math.max(-1, this.yokeY - nudge);
     }
     if (this.held.has("ArrowDown")) {
-      c.elevator = Math.min(1, c.elevator + nudge);
+      this.yokeY = Math.min(1, this.yokeY + nudge);
     }
     if (this.held.has("ArrowLeft")) {
-      c.aileron = Math.max(-1, c.aileron - nudge);
+      this.yokeX = Math.max(-1, this.yokeX - nudge);
     }
     if (this.held.has("ArrowRight")) {
-      c.aileron = Math.min(1, c.aileron + nudge);
+      this.yokeX = Math.min(1, this.yokeX + nudge);
     }
+    c.aileron = shapeYoke(this.yokeX);
+    c.elevator = shapeYoke(this.yokeY);
 
     this.freeLook = this.held.has("Space");
     if (!this.freeLook) {
@@ -169,12 +184,21 @@ export class FlightInput {
   }
 
   centerYoke(): void {
-    this.controls.elevator = 0;
-    this.controls.aileron = 0;
+    this.setYoke(0, 0);
+  }
+
+  /** Places the yoke (raw positions, -1..1, before the response curve). */
+  setYoke(x: number, y: number): void {
+    this.yokeX = x;
+    this.yokeY = y;
+    this.controls.aileron = shapeYoke(x);
+    this.controls.elevator = shapeYoke(y);
   }
 
   reset(throttle: number): void {
     Object.assign(this.controls, { elevator: 0, aileron: 0, rudder: 0, throttle, flapNotch: 0, brake: 0 });
+    this.yokeX = 0;
+    this.yokeY = 0;
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.zoom = 1;
@@ -193,10 +217,9 @@ export class FlightInput {
       this.lookPitch = Math.max(-1.2, Math.min(1.3, this.lookPitch - event.movementY * LOOK_SENSITIVITY));
       return;
     }
-    const c = this.controls;
-    c.aileron = Math.max(-1, Math.min(1, c.aileron + event.movementX / YOKE_PIXELS));
+    this.yokeX = Math.max(-1, Math.min(1, this.yokeX + event.movementX / YOKE_PIXELS));
     // Mouse toward you pulls the yoke back (nose up), like a real yoke.
-    c.elevator = Math.max(-1, Math.min(1, c.elevator + event.movementY / YOKE_PIXELS));
+    this.yokeY = Math.max(-1, Math.min(1, this.yokeY + event.movementY / YOKE_PIXELS));
   }
 
   /** Cursor mode: the yoke sits where the cursor is, relative to the middle of the view. */
@@ -215,8 +238,8 @@ export class FlightInput {
     const dx = (event.clientX - (rect.left + rect.width / 2)) / reach;
     const dy = (event.clientY - (rect.top + rect.height / 2)) / reach;
     const deadZone = (v: number) => (Math.abs(v) < 0.04 ? 0 : v);
-    this.controls.aileron = Math.max(-1, Math.min(1, deadZone(dx)));
-    this.controls.elevator = Math.max(-1, Math.min(1, deadZone(dy)));
+    this.yokeX = Math.max(-1, Math.min(1, deadZone(dx)));
+    this.yokeY = Math.max(-1, Math.min(1, deadZone(dy)));
   }
 
   private keyDown(event: KeyboardEvent): void {

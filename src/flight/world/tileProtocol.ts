@@ -43,8 +43,14 @@ export interface BuiltTile {
   readonly heights: Float32Array;
   /** One flag per terrain triangle (two per cell): 1 where it is water. */
   readonly water: Uint8Array;
-  /** Tall buildings as [lat, lon, radius, topAltitude] quadruples, for collisions. */
+  /**
+   * Buildings for collisions, as records of [vertexCount, topAltitude, lat,
+   * lon, radius, then vertexCount (east, north) footprint offsets in metres].
+   */
   readonly obstacles: Float32Array;
+  /** Vertex index where paving starts, then where runway markings start (separate draw groups). */
+  readonly pavingStart: number;
+  readonly markingStart: number;
 }
 
 export interface FailedTile {

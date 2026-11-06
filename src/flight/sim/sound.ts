@@ -10,6 +10,7 @@ export class FlightSound {
   private wind: GainNode | null = null;
   private windFilter: BiquadFilterNode | null = null;
   private horn: GainNode | null = null;
+  private hornReed: OscillatorNode | null = null;
   muted = false;
 
   start(): void {
@@ -63,14 +64,41 @@ export class FlightSound {
     source.connect(this.windFilter).connect(this.wind).connect(this.master);
     source.start();
 
-    // Stall warning horn.
-    const horn = ctx.createOscillator();
-    horn.type = "square";
-    horn.frequency.value = 410;
+    // Stall warning: the 172's horn is a reed blown by air sucked through a
+    // slot in the wing's leading edge, so it screeches rather than beeps — a
+    // harsh, fluttering whine around 1.8 kHz that rises and sharpens as the
+    // airflow over the reed strengthens near the stall.
+    const reed = ctx.createOscillator();
+    reed.type = "sawtooth";
+    reed.frequency.value = 1_700;
+    const overtone = ctx.createOscillator();
+    overtone.type = "square";
+    overtone.frequency.value = 1_700 * 1.497;
+    const overtoneLevel = ctx.createGain();
+    overtoneLevel.gain.value = 0.18;
+    // Flutter: the reed wobbles in pitch several times a second.
+    const flutter = ctx.createOscillator();
+    flutter.frequency.value = 7.5;
+    const flutterDepth = ctx.createGain();
+    flutterDepth.gain.value = 38;
+    flutter.connect(flutterDepth);
+    flutterDepth.connect(reed.frequency);
+    flutterDepth.connect(overtone.frequency);
+    const resonance = ctx.createBiquadFilter();
+    resonance.type = "bandpass";
+    resonance.frequency.value = 2_100;
+    resonance.Q.value = 3.5;
+    const edge = ctx.createWaveShaper();
+    edge.curve = new Float32Array(Array.from({ length: 256 }, (_, i) => Math.tanh(((i - 128) / 128) * 2.6)));
     this.horn = ctx.createGain();
     this.horn.gain.value = 0;
-    horn.connect(this.horn).connect(this.master);
-    horn.start();
+    reed.connect(edge);
+    overtone.connect(overtoneLevel).connect(edge);
+    edge.connect(resonance).connect(this.horn).connect(this.master);
+    reed.start();
+    overtone.start();
+    flutter.start();
+    this.hornReed = reed;
   }
 
   setMuted(muted: boolean): void {
@@ -91,7 +119,10 @@ export class FlightSound {
     this.engineGain.gain.setTargetAtTime(running ? 0.16 + throttle * 0.22 : 0, t, 0.1);
     this.wind.gain.setTargetAtTime(running ? Math.min(0.35, (airspeed / 60) ** 2 * 0.25) : 0, t, 0.15);
     this.windFilter.frequency.setTargetAtTime(300 + airspeed * 18, t, 0.15);
-    this.horn.gain.setTargetAtTime(running && stallWarning > 0.5 ? 0.06 : 0, t, 0.03);
+    // The reed starts weak and low as the warning begins, then screams.
+    const warning = running ? Math.max(0, Math.min(1, (stallWarning - 0.15) / 0.85)) : 0;
+    this.horn.gain.setTargetAtTime(warning * warning * 0.11, t, 0.04);
+    this.hornReed?.frequency.setTargetAtTime(1_550 + warning * 350, t, 0.08);
   }
 
   dispose(): void {

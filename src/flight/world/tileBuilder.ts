@@ -55,6 +55,9 @@ export interface TileGeometry {
   readonly heights: Float32Array;
   readonly water: Uint8Array;
   readonly obstacles: Float32Array;
+  /** Vertex index where paving (runways, taxiways, roads) starts, then where markings start. */
+  readonly pavingStart: number;
+  readonly markingStart: number;
 }
 
 // sRGB palette; converted to linear bytes when written.
@@ -261,6 +264,10 @@ export function buildTile(input: TileInputs): TileGeometry {
   }
 
   const out = new Writer();
+  // Paving and markings go in their own draw groups, which the renderer nudges
+  // toward the camera in depth so they lie flush on the ground without flicker.
+  const paving = new Writer();
+  const markingsOut = new Writer();
   const water = new Uint8Array(n * n * 2);
   const triangleColor = (cls: Cover, normalY: number, h: number, seed: number): [number, number] => {
     let color = COVER_COLORS[cls];
@@ -355,11 +362,10 @@ export function buildTile(input: TileInputs): TileGeometry {
     const insideTile = (p: VectorPoint) => p.x >= 0 && p.y >= 0 && p.x <= extent && p.y <= extent;
 
     // ---- Runways and taxiways as ribbons on the levelled ground ----
-    // Paving sits a few centimetres above the ground the physics rolls on:
-    // just enough not to flicker into it up close, more on the coarse tiles
-    // seen only from far away.
-    const paveLift = 0.04 * 2 ** Math.max(0, 14 - z);
-    const ribbon = (line: readonly VectorPoint[], width: number, color: number, lift: number) => {
+    // Paving lies a centimetre above the ground the physics rolls on; the
+    // depth nudge in the renderer keeps it from flickering at any distance.
+    const paveLift = 0.01;
+    const ribbon = (line: readonly VectorPoint[], width: number, color: number, lift: number, target = paving) => {
       for (let s = 0; s + 1 < line.length; s++) {
         const a = line[s];
         const b = line[s + 1];
@@ -388,8 +394,8 @@ export function buildTile(input: TileInputs): TileGeometry {
           const r0 = at(t0, 1);
           const l1 = at(t1, -1);
           const r1 = at(t1, 1);
-          out.triFacing(l0, r0, r1, color, 1, null);
-          out.triFacing(l0, r1, l1, color, 1, null);
+          target.triFacing(l0, r0, r1, color, 1, null);
+          target.triFacing(l0, r1, l1, color, 1, null);
         }
       }
     };
@@ -410,7 +416,7 @@ export function buildTile(input: TileInputs): TileGeometry {
           x: first.x + (dirX * d - dirY * (offset + (side * width) / 2)) / metersPerUnit,
           y: first.y + (dirY * d + dirX * (offset + (side * width) / 2)) / metersPerUnit,
         });
-        ribbon([p(from, 0), p(to, 0)], width, MARKING, paveLift * 1.6);
+        ribbon([p(from, 0), p(to, 0)], width, MARKING, paveLift, markingsOut);
       };
       // Centreline dashes.
       for (let d = 60; d + 30 < lengthMeters - 60; d += 60) {
@@ -433,7 +439,7 @@ export function buildTile(input: TileInputs): TileGeometry {
       }
     };
     for (const line of features.taxiways) {
-      ribbon(line, TAXIWAY_WIDTH, TAXIWAY, paveLift * 0.8);
+      ribbon(line, TAXIWAY_WIDTH, TAXIWAY, paveLift);
     }
     for (const line of features.runways) {
       ribbon(line, RUNWAY_WIDTH, ASPHALT, paveLift);
@@ -442,7 +448,8 @@ export function buildTile(input: TileInputs): TileGeometry {
 
     // ---- Roads, draped over the ground ----
     for (const road of features.roads) {
-      ribbon(road.line, road.width, road.color, 1.2);
+      // Roads drape over unlevelled ground, so they float a little higher.
+      ribbon(road.line, road.width, road.color, 0.25);
     }
 
     // ---- Buildings ----
@@ -513,8 +520,17 @@ export function buildTile(input: TileInputs): TileGeometry {
           out.triFacing(pa, pb, pc, roof, 1, inside);
         }
       }
-      if (height >= 12) {
-        obstacles.push(centerLat, centerLon, radius, top);
+      if (height >= 8) {
+        // Record: vertex count, top altitude, centre, bounding radius, then the
+        // footprint as metre offsets east/north of the centre (precise in float32).
+        const metersPerDegLat = 111_320;
+        const metersPerDegLon = 111_320 * Math.cos((centerLat * Math.PI) / 180);
+        obstacles.push(ring.length, top, centerLat, centerLon, radius);
+        for (const pt of ring) {
+          const lat = tileYToLat(y + pt.y / extent, z);
+          const lon = tileXToLon(x + pt.x / extent, z);
+          obstacles.push((lon - centerLon) * metersPerDegLon, (lat - centerLat) * metersPerDegLat);
+        }
       }
     }
 
@@ -541,9 +557,11 @@ export function buildTile(input: TileInputs): TileGeometry {
   }
 
   return {
-    positions: new Float32Array(out.positions),
-    normals: new Int8Array(out.normals),
-    colors: new Uint8Array(out.colors),
+    positions: new Float32Array([...out.positions, ...paving.positions, ...markingsOut.positions]),
+    normals: new Int8Array([...out.normals, ...paving.normals, ...markingsOut.normals]),
+    colors: new Uint8Array([...out.colors, ...paving.colors, ...markingsOut.colors]),
+    pavingStart: out.positions.length / 3,
+    markingStart: (out.positions.length + paving.positions.length) / 3,
     heights,
     water,
     obstacles: new Float32Array(obstacles),

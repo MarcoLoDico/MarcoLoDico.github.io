@@ -33,7 +33,9 @@ export const C172 = {
   },
   side: { perBeta: -0.393, perRudder: 0.187 },
   roll: { perBeta: -0.0923, perRollRate: -0.484, perYawRate: 0.0798, perAileron: 0.229, perRudder: 0.0147 },
-  pitch: { zero: 0.1, perAlpha: -1.8, perPitchRate: -12.4, perElevator: -1.28, fullFlaps: -0.07 },
+  // Elevator power tuned so full back yoke trims to the stall and half back to a
+  // gentle climb attitude, as in the real aircraft.
+  pitch: { zero: 0.1, perAlpha: -1.8, perPitchRate: -12.4, perElevator: -0.95, fullFlaps: -0.07 },
   yaw: { perBeta: 0.0587, perRollRate: -0.0278, perYawRate: -0.0937, perAileron: -0.0216, perRudder: -0.0645 },
 
   /** Surface throws in radians and how fast the controls can move them. */
@@ -58,13 +60,13 @@ export const C172 = {
    * Gear contact points in body coordinates (x right, y up, z aft), metres
    * from the centre of gravity. The drawn tyres bottom out at y -1.23 (mains)
    * and -1.2 (nose); the contact points sit lower by the static spring sag
-   * (2.9 cm mains, 1.6 cm nose) plus the 4 cm the runway paving is drawn above
+   * (about 2.5 cm on each leg) plus the 1 cm the runway paving is drawn above
    * the ground, so a parked aircraft's tyres rest exactly on the asphalt.
    */
   gear: {
-    mainLeft: [-1.27, -1.3, 0.25] as const,
-    mainRight: [1.27, -1.3, 0.25] as const,
-    nose: [0, -1.256, -1.42] as const,
+    mainLeft: [-1.27, -1.265, 0.42] as const,
+    mainRight: [1.27, -1.265, 0.42] as const,
+    nose: [0, -1.24, -1.24] as const,
     // Stiff like the real spring-steel legs: about 3 cm of sag at rest.
     mainStiffness: 150_000,
     mainDamping: 9_000,

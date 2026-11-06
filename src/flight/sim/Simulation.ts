@@ -19,7 +19,7 @@ import { airDensity, SEA_LEVEL_DENSITY } from "../physics/atmosphere";
 import { buildCessna, type CessnaModel } from "../render/cessna";
 import { loadCockpit, type Cockpit } from "../render/cockpit";
 import { Clouds, Sky } from "../render/sky";
-import { Terrain } from "../world/terrain";
+import { insideFootprint, Terrain } from "../world/terrain";
 import { Waypoints } from "../world/waypoints";
 import { distanceMeters, EARTH_RADIUS, LocalFrame } from "./geo";
 import { FlightSound } from "./sound";
@@ -33,6 +33,17 @@ const KNOTS = 1.943844;
 const FEET = 3.28084;
 const WARPS = [1, 2, 4, 8, 16] as const;
 const DEG = Math.PI / 180;
+/**
+ * Points on the airframe checked against buildings and landmarks: the
+ * centre, both wingtips, the nose, and the tail.
+ */
+const COLLISION_POINTS: readonly (readonly [number, number, number])[] = [
+  [0, 0, 0],
+  [-5.4, 1.2, 0.4],
+  [5.4, 1.2, 0.4],
+  [0, 0, -2.4],
+  [0, 0.4, 5.6],
+];
 /** Pilot's eye in body coordinates. */
 const EYE = new Vector3(-0.27, 0.78, -0.06);
 
@@ -216,7 +227,8 @@ export class Simulation {
       this.aircraft.orientation.multiply(pitch);
       const tas = start.airborne.speedKt / KNOTS / Math.sqrt(airDensity(this.aircraft.position.y) / SEA_LEVEL_DENSITY);
       this.aircraft.velocity.set(0, 0, -tas).applyQuaternion(this.aircraft.orientation);
-      this.input.controls.elevator = -0.06;
+      // A touch of forward pressure for level flight at 100 kt.
+      this.input.setYoke(0, -0.14);
     }
     this.aircraft.rpm = start.airborne ? 2_300 : 650;
     this.chaseYaw = -start.heading * DEG;
@@ -406,8 +418,8 @@ export class Simulation {
       return;
     }
     if (ground && ground.zoom >= 14) {
-      // Settle on the gear: contact points 1.3 m below the CG, less the sag.
-      a.position.y = ground.height + 1.28;
+      // Settle on the gear: contact points 1.27 m below the CG, less the sag.
+      a.position.y = ground.height + 1.25;
       a.velocity.set(0, 0, 0);
       this.status = "paused";
     }
@@ -425,24 +437,45 @@ export class Simulation {
     }
     const a = this.aircraft;
     if (!a.crashed) {
-      const hit = this.landmarks.collision(this.frame, a.position.x, a.position.y, a.position.z);
-      if (hit) {
-        a.crashed = "obstacle";
-        this.crashText = `You hit the ${hit}.`;
-      } else {
-        const g = this.frame.toGeodetic(a.position.x, a.position.y, a.position.z);
-        for (const obstacle of this.terrain.obstaclesNear(g.lat, g.lon)) {
-          if (g.alt < obstacle.top && distanceMeters(g, obstacle) < obstacle.radius * 0.85) {
-            a.crashed = "obstacle";
-            break;
-          }
-        }
-      }
+      this.checkObstacles();
     }
     if (a.crashed) {
       this.crashText ??= CRASH_TEXT[a.crashed];
       this.status = "crashed";
       this.warpIndex = 0;
+    }
+  }
+
+  /** Tests the airframe's extremities against landmarks and building footprints. */
+  private checkObstacles(): void {
+    const a = this.aircraft;
+    const centre = this.frame.toGeodetic(a.position.x, a.position.y, a.position.z);
+    const nearby = [...this.terrain.obstaclesNear(centre.lat, centre.lon)].filter(
+      (o) => centre.alt - 8 < o.top && distanceMeters(centre, o) < o.radius + 8,
+    );
+    for (const [bx, by, bz] of COLLISION_POINTS) {
+      const p = this.tmp.set(bx, by, bz).applyQuaternion(a.orientation).add(a.position);
+      const hit = this.landmarks.collision(this.frame, p.x, p.y, p.z);
+      if (hit) {
+        a.crashed = "obstacle";
+        this.crashText = `You hit the ${hit}.`;
+        return;
+      }
+      if (nearby.length === 0) {
+        continue;
+      }
+      const g = this.frame.toGeodetic(p.x, p.y, p.z);
+      for (const obstacle of nearby) {
+        if (g.alt >= obstacle.top) {
+          continue;
+        }
+        const east = (g.lon - obstacle.lon) * 111_320 * Math.cos((obstacle.lat * Math.PI) / 180);
+        const north = (g.lat - obstacle.lat) * 111_320;
+        if (insideFootprint(obstacle, east, north)) {
+          a.crashed = "obstacle";
+          return;
+        }
+      }
     }
   }
 

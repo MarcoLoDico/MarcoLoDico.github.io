@@ -568,17 +568,19 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
   const gear = new MeshBuilder();
   const gearSatin = new MeshBuilder();
   for (const side of [-1, 1]) {
-    springLeg(gearSatin, [side * 0.44, -0.47, 0.25], [side * 1.15, -0.92, 0.25]);
-    wheel(gear, gearSatin, [side * 1.27, -0.93, 0.25], 0.3, 0.15);
-    wheelPant(gear, [side * 1.27, -0.93, 0.25], 0.3, 0.14, 1.12);
+    // Mains 0.42 m behind the centre of gravity, as on the real aircraft.
+    springLeg(gearSatin, [side * 0.44, -0.47, 0.42], [side * 1.15, -0.92, 0.42]);
+    wheel(gear, gearSatin, [side * 1.27, -0.93, 0.42], 0.3, 0.15);
+    wheelPant(gear, [side * 1.27, -0.93, 0.42], 0.3, 0.14, 1.12);
   }
   // Nose gear: oleo strut with a chrome piston, fork, and a smaller fairing.
-  gearSatin.beam([0, -0.4, -1.34], [0, -0.62, -1.4], 0.06, 8, STEEL);
-  gearSatin.beam([0, -0.62, -1.4], [0, -0.86, -1.42], 0.04, 8, CHROME);
-  gearSatin.beam([-0.09, -0.66, -1.4], [-0.09, -0.95, -1.42], 0.018, 4, STEEL);
-  gearSatin.beam([0.09, -0.66, -1.4], [0.09, -0.95, -1.42], 0.018, 4, STEEL);
-  wheel(gear, gearSatin, [0, -0.95, -1.42], 0.25, 0.13);
-  wheelPant(gear, [0, -0.95, -1.42], 0.25, 0.12, 0.86);
+  // Nose gear 1.65 m ahead of the mains (the C172S wheelbase).
+  gearSatin.beam([0, -0.42, -1.3], [0, -0.62, -1.24], 0.06, 8, STEEL);
+  gearSatin.beam([0, -0.62, -1.24], [0, -0.86, -1.24], 0.04, 8, CHROME);
+  gearSatin.beam([-0.09, -0.66, -1.24], [-0.09, -0.95, -1.24], 0.018, 4, STEEL);
+  gearSatin.beam([0.09, -0.66, -1.24], [0.09, -0.95, -1.24], 0.018, 4, STEEL);
+  wheel(gear, gearSatin, [0, -0.95, -1.24], 0.25, 0.13);
+  wheelPant(gear, [0, -0.95, -1.24], 0.25, 0.12, 0.86);
   add(gear.build(CREASE), paint);
   add(gearSatin.build(CREASE), satin);
 
