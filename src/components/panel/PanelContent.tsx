@@ -14,7 +14,6 @@ interface PanelContentProps {
   readonly onHoverPlace: (placeId: string | null) => void;
   readonly onShowCategory: (categoryId: CategoryId | null) => void;
   readonly onClosePlace: () => void;
-  readonly onSharePlace: (place: Place) => void;
 }
 
 export function panelLabel(explorer: ExplorerState): string {
@@ -32,7 +31,6 @@ export function PanelContent({
   onHoverPlace,
   onShowCategory,
   onClosePlace,
-  onSharePlace,
 }: PanelContentProps) {
   const place = explorer.placeId ? findPlace(explorer.placeId) : undefined;
 
@@ -44,7 +42,6 @@ export function PanelContent({
         backLabel={explorer.categoryId ? `Back to ${getCategory(explorer.categoryId).label}` : "Back to overview"}
         hoveredPlaceId={hoveredPlaceId}
         onBack={onClosePlace}
-        onShare={onSharePlace}
         onSelectPlace={onSelectPlace}
         onHoverPlace={onHoverPlace}
       />

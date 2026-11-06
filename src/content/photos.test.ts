@@ -3,7 +3,7 @@ import { photo } from "./photos";
 
 describe("photo", () => {
   it("resolves a photo to responsive WebP and JPEG sources", () => {
-    const picture = photo("taormina-teatro-antico.jpg");
+    const picture = photo("marco-portrait.jpg");
 
     expect(Object.keys(picture.sources).sort()).toEqual(["jpeg", "webp"]);
     expect(picture.img.w).toBeGreaterThan(0);

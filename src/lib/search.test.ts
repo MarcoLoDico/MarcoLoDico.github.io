@@ -34,9 +34,8 @@ describe("createSearchIndex", () => {
     expect(first?.matchedTag).toBe("Supabase");
   });
 
-  it("finds travel stops by trip name and photo caption", () => {
-    expect(resultIds("sicily")).toContain("taormina");
-    expect(resultIds("teatro")).toEqual(["taormina"]);
+  it("finds places by photo caption", () => {
+    expect(resultIds("rooftop")).toEqual(["shopify"]);
   });
 
   it("requires every word of the query to match", () => {

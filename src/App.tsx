@@ -11,7 +11,6 @@ import { Sidebar, SIDEBAR_FOOTPRINT } from "./components/panel/Sidebar";
 import { SearchBox } from "./components/SearchBox";
 import { SocialLinks } from "./components/SocialLinks";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { Toast, useToast } from "./components/Toast";
 import { getCategory } from "./content/categories";
 import { findPlace } from "./content/places";
 import { profile } from "./content/profile";
@@ -21,7 +20,7 @@ import { useExplorer } from "./hooks/useExplorer";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useTheme } from "./hooks/useTheme";
 import { isTypingTarget } from "./lib/dom";
-import { serializeExplorerState, type ExplorerState } from "./lib/explorer";
+import type { ExplorerState } from "./lib/explorer";
 import type { MapPadding } from "./map/padding";
 import { placesInCategory } from "./map/placePositions";
 import "./App.css";
@@ -63,15 +62,9 @@ function documentTitleFor(explorer: ExplorerState): string {
   return section ? `${section} · ${profile.name}` : `${profile.name} — Software Engineer`;
 }
 
-function shareUrlFor(place: Place): string {
-  const { origin, pathname } = window.location;
-  return `${origin}${pathname}${serializeExplorerState({ categoryId: null, placeId: place.id })}`;
-}
-
 export function App() {
   const [explorer, dispatch] = useExplorer();
   const { theme, toggleTheme } = useTheme();
-  const { message: toastMessage, showToast } = useToast();
   const isCompact = useMediaQuery(COMPACT_LAYOUT_QUERY);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -115,21 +108,6 @@ export function App() {
     requestAnimationFrame(() => document.getElementById("skills")?.scrollIntoView({ behavior: "smooth" }));
   }, [dispatch, revealPanel]);
 
-  const sharePlace = useCallback(
-    (place: Place) => {
-      const url = shareUrlFor(place);
-      if (isCompact && typeof navigator.share === "function") {
-        navigator.share({ title: `${place.name} · ${profile.name}`, url }).catch(() => undefined);
-        return;
-      }
-      navigator.clipboard
-        .writeText(url)
-        .then(() => showToast("Link copied to clipboard"))
-        .catch(() => showToast("Couldn’t copy the link"));
-    },
-    [isCompact, showToast],
-  );
-
   useEffect(() => {
     document.title = documentTitleFor(explorer);
   }, [explorer]);
@@ -158,7 +136,6 @@ export function App() {
       onHoverPlace={setHoveredPlaceId}
       onShowCategory={showCategory}
       onClosePlace={closePlace}
-      onSharePlace={sharePlace}
     />
   );
 
@@ -202,7 +179,6 @@ export function App() {
         </Sidebar>
       )}
 
-      <Toast message={toastMessage} />
     </div>
   );
 }

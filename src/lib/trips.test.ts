@@ -8,7 +8,7 @@ const japan: Trip = { id: "japan", name: "Japan", period: "2026" };
 function placeOn(id: string, trip?: Trip): Place {
   return {
     id,
-    category: "travel",
+    category: "experience",
     name: id,
     subtitle: "",
     period: "",

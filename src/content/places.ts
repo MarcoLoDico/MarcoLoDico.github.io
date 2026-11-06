@@ -1,4 +1,4 @@
-import { travels } from "./travels";
+import { photo } from "./photos";
 import type { Place, Site } from "./types";
 
 const ontarioChamberOfCommerce: Site = {
@@ -108,6 +108,18 @@ export const places: readonly Place[] = [
     tags: ["Production infrastructure", "Backend", "GraphQL", "SQL", "Observability", "Ruby on Rails", "Alerting", "Migrations"],
     links: [{ label: "shopify.com", href: "https://www.shopify.com" }],
     featured: true,
+    photos: [
+      {
+        picture: photo("shopify-toronto-rooftop.jpg"),
+        alt: "Marco on a rooftop terrace in downtown Toronto, with the CN Tower and skyline behind him",
+        caption: "Toronto rooftop",
+      },
+      {
+        picture: photo("shopify-interns.jpg"),
+        alt: "A group of Shopify interns and staff posing together in the Toronto office, with the skyline through the windows",
+        caption: "High Impact Intern Lunch",
+      },
+    ],
   },
   {
     id: "ontario-chamber-of-commerce",
@@ -279,7 +291,6 @@ export const places: readonly Place[] = [
     tags: ["Officiating", "Hockey", "Leadership"],
     links: [],
   },
-  ...travels,
 ];
 
 export function findPlace(id: string): Place | undefined {

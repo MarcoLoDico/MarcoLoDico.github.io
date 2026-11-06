@@ -103,17 +103,6 @@
   background: var(--color-surface-solid);
 }
 
-.icon-button--glass {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-  backdrop-filter: blur(10px);
-}
-
-.icon-button--glass:hover {
-  background: rgba(255, 255, 255, 0.36);
-  color: #fff;
-}
-
 .social-links {
   display: flex;
   gap: 6px;
@@ -209,46 +198,4 @@ button.chip:hover {
 :root[data-theme="dark"] .category-badge {
   background: color-mix(in srgb, var(--category-color) 26%, transparent);
   color: color-mix(in srgb, var(--category-color) 55%, white);
-}
-
-/* ---- Toast ---- */
-
-.toast-region {
-  position: absolute;
-  left: 50%;
-  bottom: 28px;
-  z-index: 40;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.app--compact .toast-region {
-  top: 130px;
-  bottom: auto;
-}
-
-.toast {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: var(--radius-pill);
-  background: #0f172a;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: var(--shadow-floating);
-  animation: toast-in 260ms var(--ease-spring);
-}
-
-:root[data-theme="dark"] .toast {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-  }
 }

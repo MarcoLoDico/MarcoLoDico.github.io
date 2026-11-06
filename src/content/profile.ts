@@ -1,4 +1,5 @@
-import type { Link } from "./types";
+import { photo } from "./photos";
+import type { Link, Photo } from "./types";
 
 export interface SkillGroup {
   readonly label: string;
@@ -13,7 +14,7 @@ export interface SocialLink extends Link {
 
 export const profile = {
   name: "Marco Lo Dico",
-  initials: "ML",
+  portrait: { picture: photo("marco-portrait.jpg"), alt: "Marco Lo Dico smiling at sunset on a boat" },
   headline: "Software Engineering · University of Waterloo",
   bio: "Production infrastructure, backend systems, and product engineering. Previously interned at Shopify. Co-founder of Cookd.ca.",
   socials: [
@@ -28,7 +29,7 @@ export const profile = {
   ],
 } as const satisfies {
   name: string;
-  initials: string;
+  portrait: Photo;
   headline: string;
   bio: string;
   socials: readonly SocialLink[];

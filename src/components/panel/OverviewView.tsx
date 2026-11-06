@@ -3,6 +3,7 @@ import { categories } from "../../content/categories";
 import { places } from "../../content/places";
 import { profile } from "../../content/profile";
 import type { CategoryId, Place } from "../../content/types";
+import { ResponsivePicture } from "../photos/ResponsivePicture";
 import { SocialLinks } from "../SocialLinks";
 import { PlaceListItem } from "./PlaceListItem";
 
@@ -23,9 +24,13 @@ export function OverviewView({ hoveredPlaceId, onSelectPlace, onHoverPlace, onSh
   return (
     <div className="panel-view">
       <header className="profile">
-        <div className="profile__avatar" aria-hidden="true">
-          {profile.initials}
-        </div>
+        <ResponsivePicture
+          picture={profile.portrait.picture}
+          alt={profile.portrait.alt}
+          sizes="56px"
+          className="profile__avatar"
+          loading="eager"
+        />
         <div>
           <h1 className="profile__name">{profile.name}</h1>
           <p className="profile__headline">{profile.headline}</p>

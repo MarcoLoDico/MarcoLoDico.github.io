@@ -1,10 +1,9 @@
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Share2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { getCategory } from "../../content/categories";
 import { places } from "../../content/places";
 import type { Highlight, Place, PlaceSection } from "../../content/types";
 import { placesOnSameTrip } from "../../lib/trips";
-import { CategoryBadge } from "../CategoryBadge";
 import { IconButton } from "../IconButton";
 import { PhotoViewer } from "../photos/PhotoViewer";
 import { ResponsivePicture } from "../photos/ResponsivePicture";
@@ -15,20 +14,11 @@ interface PlaceViewProps {
   readonly backLabel: string;
   readonly hoveredPlaceId: string | null;
   readonly onBack: () => void;
-  readonly onShare: (place: Place) => void;
   readonly onSelectPlace: (place: Place) => void;
   readonly onHoverPlace: (placeId: string | null) => void;
 }
 
-export function PlaceView({
-  place,
-  backLabel,
-  hoveredPlaceId,
-  onBack,
-  onShare,
-  onSelectPlace,
-  onHoverPlace,
-}: PlaceViewProps) {
+export function PlaceView({ place, backLabel, hoveredPlaceId, onBack, onSelectPlace, onHoverPlace }: PlaceViewProps) {
   const category = getCategory(place.category);
   const style: CSSProperties = { "--category-color": category.color };
   const photos = place.photos ?? [];
@@ -38,7 +28,7 @@ export function PlaceView({
 
   return (
     <article className="panel-view place-view" style={style}>
-      <div className={cover ? "place-hero place-hero--photo" : "place-hero"}>
+      <div className={cover ? "place-hero place-hero--photo" : "place-hero place-hero--plain"}>
         {cover && (
           <button
             type="button"
@@ -52,11 +42,10 @@ export function PlaceView({
         <IconButton
           label={backLabel}
           onClick={onBack}
-          className={`place-hero__back ${cover ? "icon-button--scrim" : "icon-button--glass"}`}
+          className={cover ? "place-hero__back icon-button--scrim" : "place-hero__back"}
         >
           <ArrowLeft size={18} />
         </IconButton>
-        <CategoryBadge categoryId={place.category} size="large" />
       </div>
 
       <header className="place-view__header">
@@ -75,24 +64,22 @@ export function PlaceView({
         </ul>
       </header>
 
-      <div className="place-actions">
-        {place.links.map((link, index) => (
-          <a
-            key={link.href}
-            className={index === 0 ? "action-button action-button--primary" : "action-button"}
-            href={link.href}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <ExternalLink size={16} aria-hidden="true" />
-            {link.label}
-          </a>
-        ))}
-        <button type="button" className="action-button" onClick={() => onShare(place)}>
-          <Share2 size={16} aria-hidden="true" />
-          Share
-        </button>
-      </div>
+      {place.links.length > 0 && (
+        <div className="place-actions">
+          {place.links.map((link, index) => (
+            <a
+              key={link.href}
+              className={index === 0 ? "action-button action-button--primary" : "action-button"}
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={16} aria-hidden="true" />
+              {link.label}
+            </a>
+          ))}
+        </div>
+      )}
 
       <p className="place-view__summary">{place.summary}</p>
 
@@ -161,9 +148,15 @@ export function PlaceView({
 /** Stops on the same trip for travel, otherwise whatever else shares the place's site. */
 function relatedPlaces(place: Place): { readonly title: string; readonly places: readonly Place[] } {
   if (place.trip) {
-    return { title: `More from ${place.trip.name}`, places: placesOnSameTrip(place, places) };
+    return {
+      title: `More from ${place.trip.name}`,
+      places: placesOnSameTrip(place, places),
+    };
   }
-  return { title: "Also here", places: places.filter((other) => other.site.id === place.site.id && other.id !== place.id) };
+  return {
+    title: "Also here",
+    places: places.filter((other) => other.site.id === place.site.id && other.id !== place.id),
+  };
 }
 
 function PlaceSectionView({ section }: { readonly section: PlaceSection }) {

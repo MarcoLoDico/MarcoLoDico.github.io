@@ -1,6 +1,6 @@
 import type { Picture } from "vite-imagetools";
 
-export type CategoryId = "experience" | "projects" | "education" | "other-work" | "travel";
+export type CategoryId = "experience" | "projects" | "education" | "other-work";
 
 export type LngLat = readonly [longitude: number, latitude: number];
 
