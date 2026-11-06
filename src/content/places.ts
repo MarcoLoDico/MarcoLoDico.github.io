@@ -7,10 +7,10 @@ const ontarioChamberOfCommerce: Site = {
   coordinates: [-79.3867, 43.6555],
 };
 
-const toronto: Site = {
-  id: "toronto",
-  label: "Toronto, Ontario",
-  coordinates: [-79.3957, 43.6453],
+const shopifyToronto: Site = {
+  id: "shopify-toronto",
+  label: "620 King St. W, Toronto, Ontario",
+  coordinates: [-79.401, 43.6443],
 };
 
 const universityOfWaterloo: Site = {
@@ -51,7 +51,7 @@ export const places: readonly Place[] = [
     name: "Shopify",
     subtitle: "Three engineering internships",
     period: "Jan. 2025 — Aug. 2026",
-    site: toronto,
+    site: shopifyToronto,
     summary:
       "Production infrastructure and Customer Account API work across three internship terms, from zero-downtime migrations to public API features used by third-party developers.",
     sections: [
@@ -259,7 +259,7 @@ export const places: readonly Place[] = [
     category: "other-work",
     name: "Baseball Umpire",
     subtitle: "Baseball Ontario",
-    period: "2018 — Present",
+    period: "May 2018 — Aug. 2024",
     site: northHillPark,
     summary: "Rep games across age groups, including twelve tournament championships.",
     sections: [
@@ -279,7 +279,7 @@ export const places: readonly Place[] = [
     category: "other-work",
     name: "Hockey Referee",
     subtitle: "Ontario Minor Hockey Association",
-    period: "2019 — 2023",
+    period: "Sept. 2019 — Aug. 2023",
     site: caledonEastCommunityComplex,
     summary: "Officiated across multiple levels, including rep hockey.",
     sections: [
