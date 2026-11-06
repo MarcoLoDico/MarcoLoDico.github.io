@@ -17,6 +17,7 @@ import { Landmarks } from "../landmarks/landmarks";
 import { Aircraft, type CrashCause, type GroundContact, type GroundProbe } from "../physics/aircraft";
 import { airDensity, SEA_LEVEL_DENSITY } from "../physics/atmosphere";
 import { buildCessna, type CessnaModel } from "../render/cessna";
+import { loadCockpit, type Cockpit } from "../render/cockpit";
 import { Clouds, Sky } from "../render/sky";
 import { Terrain } from "../world/terrain";
 import { Waypoints } from "../world/waypoints";
@@ -33,7 +34,7 @@ const FEET = 3.28084;
 const WARPS = [1, 2, 4, 8, 16] as const;
 const DEG = Math.PI / 180;
 /** Pilot's eye in body coordinates. */
-const EYE = new Vector3(-0.27, 0.86, -0.06);
+const EYE = new Vector3(-0.27, 0.78, -0.06);
 
 export type ViewMode = "cockpit" | "chase";
 export type SimStatus = "menu" | "loading" | "flying" | "paused" | "crashed";
@@ -99,6 +100,8 @@ export class Simulation {
   private readonly sky: Sky;
   private readonly clouds = new Clouds();
   private readonly model: CessnaModel;
+  /** The Blender-modelled cabin; null until its GLB has loaded. */
+  private cockpit: Cockpit | null = null;
   private readonly aircraft = new Aircraft();
   private readonly input: FlightInput;
   private readonly sound = new FlightSound();
@@ -163,6 +166,14 @@ export class Simulation {
     this.model = buildCessna();
     this.scene.add(this.model.root);
     this.model.root.visible = false;
+    loadCockpit()
+      .then((cockpit) => {
+        this.cockpit = cockpit;
+        this.model.root.add(cockpit.root);
+      })
+      .catch((error: unknown) => {
+        console.error("Couldn't load the cabin model", error);
+      });
 
     this.input = new FlightInput(this.renderer.domElement, (action) => this.handleAction(action));
     this.renderer.domElement.addEventListener("click", () => {
@@ -475,12 +486,14 @@ export class Simulation {
     }
 
     const inCockpit = this.view === "cockpit";
-    m.pilot.visible = !inCockpit;
+    if (this.cockpit?.pilot) {
+      this.cockpit.pilot.visible = !inCockpit;
+    }
     m.glass.opacity = inCockpit ? 0.08 : 0.86;
 
     const up = this.tmp.set(a.position.x, a.position.y + EARTH_RADIUS, a.position.z).normalize();
     const g = a.angularVelocity;
-    m.cockpit.update({
+    this.cockpit?.update({
       airspeedKt: a.indicatedAirspeed * KNOTS,
       pitchDeg: a.pitchDeg(),
       bankDeg: a.bankDeg(),
@@ -506,7 +519,7 @@ export class Simulation {
     if (this.view === "cockpit") {
       cam.position.copy(EYE).applyQuaternion(a.orientation).add(a.position);
       // Eyes rest a little below the horizon, so the six-pack is in view.
-      this.euler.set(this.input.lookPitch - 0.1, this.input.lookYaw, 0);
+      this.euler.set(this.input.lookPitch - 0.14, this.input.lookYaw, 0);
       this.look.setFromEuler(this.euler);
       cam.quaternion.copy(a.orientation).multiply(this.look);
       cam.near = 0.04;

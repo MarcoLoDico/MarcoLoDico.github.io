@@ -13,7 +13,6 @@ import {
   type BufferGeometry,
   type Material,
 } from "three";
-import { buildCockpit, cabinLining, type Cockpit } from "./cockpit";
 import { MeshBuilder, type V3 } from "./meshBuilder";
 
 /**
@@ -158,12 +157,9 @@ function fuselagePaint(band: number, segment: number): number {
   const k = mirrorSegment(segment);
   const roof = (SEG.roof as readonly number[]).includes(k);
   const window = k === SEG.window;
-  // Windshield over the top, wrapping into small front side windows beside
-  // the panel, then the slim A-pillar (band 6) before the door window.
-  if ((band === 4 || band === 5) && (roof || k === 2 || k === 3)) {
-    return GLASS;
-  }
-  if (band === 5 && (k === 4 || window)) {
+  // Windshield over the top, wrapping down to the cowl at the sides, then
+  // the slim A-pillar (band 6) before the door window.
+  if ((band === 4 || band === 5) && (roof || k === 2 || k === 3 || k === 4 || window)) {
     return GLASS;
   }
   // Door window, then the B-pillar (band 8), then the rear side window.
@@ -314,8 +310,6 @@ export interface CessnaModel {
   readonly propeller: Object3D;
   readonly propDisc: Mesh;
   readonly blades: Mesh;
-  readonly cockpit: Cockpit;
-  readonly pilot: Mesh;
   readonly beacon: Mesh;
   readonly strobes: Mesh[];
 }
@@ -613,36 +607,7 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
   }
   exterior.push(propeller, propDisc);
 
-  // ---- Cockpit, cabin lining, and the pilot (hidden in the cockpit view) ----
-  const cockpit = buildCockpit();
-  root.add(cockpit.root);
-  root.add(cabinLining(rings, (band, segment) => fuselagePaint(band, segment) === GLASS, 3, 11));
-
-  const pilot = new MeshBuilder();
-  pilot.loft(
-    [
-      [0.0, 0.17, 0.12],
-      [0.25, 0.2, 0.13],
-      [0.5, 0.18, 0.12],
-      [0.56, 0.06, 0.06],
-    ].map(([dy, rx, rz]) => Array.from({ length: 8 }, (_, k): V3 => [-0.27 + Math.cos((k / 8) * Math.PI * 2) * (rx ?? 0), 0.0 + (dy ?? 0), 0.12 + Math.sin((k / 8) * Math.PI * 2) * (rz ?? 0)])),
-    () => 0x34506e,
-  );
-  pilot.loft(
-    [0.56, 0.62, 0.7, 0.78, 0.82].map((y, i) =>
-      Array.from({ length: 10 }, (_, k): V3 => {
-        const r = [0.06, 0.085, 0.09, 0.075, 0.03][i] ?? 0.05;
-        return [-0.27 + Math.cos((k / 10) * Math.PI * 2) * r, y, 0.1 + Math.sin((k / 10) * Math.PI * 2) * r * 1.1];
-      }),
-    ),
-    (ring) => (ring >= 2 ? 0x2d241c : 0xe0b394),
-  );
-  pilot.box([-0.27, 0.775, 0.1], [0.21, 0.035, 0.05], 0x1e1f21);
-  pilot.box([-0.37, 0.7, 0.1], [0.03, 0.08, 0.08], 0x1e1f21);
-  pilot.box([-0.17, 0.7, 0.1], [0.03, 0.08, 0.08], 0x1e1f21);
-  const pilotMesh = add(pilot.build(CREASE), paint, false);
-
-  return { root, exterior, glass, cockpit, pilot: pilotMesh, blades, leftAileron, rightAileron, leftFlap, rightFlap, elevator, rudder, propeller, propDisc, beacon, strobes };
+  return { root, exterior, glass, blades, leftAileron, rightAileron, leftFlap, rightFlap, elevator, rudder, propeller, propDisc, beacon, strobes };
 }
 
 // ---------------------------------------------------------------------------

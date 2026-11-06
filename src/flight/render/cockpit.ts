@@ -1,28 +1,19 @@
 import {
-  BackSide,
-  BufferAttribute,
   CanvasTexture,
-  CircleGeometry,
-  DoubleSide,
-  Group,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
-  Object3D,
-  PlaneGeometry,
   SRGBColorSpace,
+  Vector3,
+  type BufferAttribute,
   type BufferGeometry,
-  type Material,
+  type Object3D,
 } from "three";
-import { MeshBuilder, type V3 } from "./meshBuilder";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 /**
- * The C172S cockpit in the aircraft's body frame (x right, y up, -z forward;
- * the pilot's eye is at about (-0.27, 0.8, -0.08)). The layout follows the
- * real steam-gauge 172S panel: six-pack in front of the pilot, VOR heads to
- * its right, the radio stack in the middle, fuel and engine gauges on the
- * right, push-pull engine controls low in the centre. Instruments are drawn
- * on a canvas and mapped onto the gauge faces, so every needle is live.
+ * The C172S cabin. Its geometry is modelled in Blender (blender/build_cabin.py
+ * → public/models/c172-cabin.glb); this module loads it, paints the live
+ * instrument faces onto the named gauge meshes, and moves the controls.
  */
 
 export interface InstrumentState {
@@ -47,21 +38,13 @@ export interface InstrumentState {
 }
 
 export interface Cockpit {
-  readonly root: Group;
+  readonly root: Object3D;
+  /** The seated pilot, hidden when you're the one in the seat. */
+  readonly pilot: Object3D | null;
   update(state: InstrumentState): void;
 }
 
-const PANEL_Z = -0.86;
-const FLOOR_Y = -0.3;
-const PANEL_GRAY = 0x5a5d62;
-const PANEL_EDGE = 0x4a4d52;
-const GLARESHIELD = 0x1b1d21;
-const BEZEL = 0x101112;
-const CARPET = 0x45423c;
-const LEATHER = 0x7c756a;
-const LEATHER_DARK = 0x5a554d;
-const CHROME = 0xc9ccd0;
-const PLACARD = 0xe8e6df;
+const CABIN_URL = `${import.meta.env.BASE_URL}models/c172-cabin.glb`;
 
 const CELL = 256;
 const ATLAS_COLUMNS = 4;
@@ -82,419 +65,101 @@ const CELLS: Record<GaugeName, [number, number]> = {
   engine: [3, 2],
 };
 
-/** Height of the panel's top edge across its width: an arc that drops toward the doors. */
-function panelTop(x: number): number {
-  return 0.43 - x * x * 0.26;
+function isGaugeName(name: string): name is GaugeName {
+  return name in CELLS;
 }
 
-/** Remaps a geometry's 0–1 texture coordinates onto one atlas cell. */
-function mapToCell(geometry: BufferGeometry, cell: [number, number]): BufferGeometry {
-  const uv = geometry.getAttribute("uv") as BufferAttribute;
-  const [column, row] = cell;
+/**
+ * Points a face's 0..1 texture coordinates at part of a canvas. Blender's
+ * exporter writes glTF's top-left UV origin; canvas textures use bottom-left.
+ */
+function remapUv(geometry: BufferGeometry, column = 0, row = 0, columns = 1, rows = 1): void {
+  const uv = geometry.getAttribute("uv") as BufferAttribute | undefined;
+  if (!uv) {
+    return;
+  }
   for (let i = 0; i < uv.count; i++) {
-    uv.setXY(i, (column + uv.getX(i)) / ATLAS_COLUMNS, 1 - (row + 1) / ATLAS_ROWS + uv.getY(i) / ATLAS_ROWS);
+    const u = uv.getX(i);
+    const v = 1 - uv.getY(i);
+    uv.setXY(i, (column + u) / columns, 1 - (row + 1) / rows + v / rows);
   }
-  return geometry;
+  uv.needsUpdate = true;
 }
 
-/** A ring of points around the z axis (a circle facing the pilot). */
-function ringZ(cx: number, cy: number, z: number, radius: number, sides: number): V3[] {
-  return Array.from({ length: sides }, (_, k): V3 => {
-    const t = (k / sides) * Math.PI * 2;
-    return [cx + Math.cos(t) * radius, cy + Math.sin(t) * radius, z];
-  });
+function canvasTexture(canvas: HTMLCanvasElement): CanvasTexture {
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
 }
 
-/** A rounded square in the panel plane, for instrument bezels. */
-function roundedSquare(cx: number, cy: number, z: number, half: number, corner: number): V3[] {
-  const points: V3[] = [];
-  for (let q = 0; q < 4; q++) {
-    const sx = q === 0 || q === 3 ? 1 : -1;
-    const sy = q < 2 ? 1 : -1;
-    for (let k = 0; k <= 3; k++) {
-      const a = ((q * 90 + k * 30) * Math.PI) / 180;
-      points.push([cx + sx * (half - corner) + Math.cos(a) * corner, cy + sy * (half - corner) + Math.sin(a) * corner, z]);
-    }
-  }
-  return points;
-}
+/** Loads the cabin model and wires up its instruments and controls. */
+export async function loadCockpit(): Promise<Cockpit> {
+  const gltf = await new GLTFLoader().loadAsync(CABIN_URL);
+  const root = gltf.scene;
+  root.name = "cabin";
 
-/** A round instrument hole in the light panel: a thin black rim and the recess down to the dial. */
-function instrumentBezel(b: MeshBuilder, cx: number, cy: number, radius: number): void {
-  const z = PANEL_Z;
-  const sides = 32;
-  b.loft([ringZ(cx, cy, z + 0.001, radius + 0.007, sides), ringZ(cx, cy, z + 0.004, radius + 0.005, sides), ringZ(cx, cy, z + 0.004, radius + 0.001, sides)], () => BEZEL, false);
-  b.loft([ringZ(cx, cy, z + 0.004, radius + 0.001, sides), ringZ(cx, cy, z + 0.0015, radius, sides)], () => 0x060606, false);
-}
-
-/** A flat label plate (placards, switch legends). */
-function placard(b: MeshBuilder, cx: number, cy: number, width: number, height: number, color = PLACARD): void {
-  const z = PANEL_Z + 0.0012;
-  b.quad([cx - width / 2, cy - height / 2, z], [cx + width / 2, cy - height / 2, z], [cx + width / 2, cy + height / 2, z], [cx - width / 2, cy + height / 2, z], color, [cx, cy, z - 1]);
-}
-
-function addMesh(parent: Object3D, geometry: BufferGeometry, material: Material): Mesh {
-  const mesh = new Mesh(geometry, material);
-  mesh.receiveShadow = true;
-  parent.add(mesh);
-  return mesh;
-}
-
-export function buildCockpit(): Cockpit {
-  const root = new Group();
-  root.name = "cockpit";
-  const matte = new MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.05 });
-  const satin = new MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.35 });
-  const soft = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: DoubleSide });
-  const crease = 32;
-
-  // ---- Panel structure ----
-  const panel = new MeshBuilder();
-  // The panel face: light grey, its top edge following the glareshield's arc,
-  // its ends wrapping back toward the doors.
-  const top = 0.43;
-  const bottom = -0.06;
-  const xs = [-0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5];
-  for (let k = 0; k + 1 < xs.length; k++) {
-    const x0 = xs[k] ?? 0;
-    const x1 = xs[k + 1] ?? 0;
-    panel.quad([x0, bottom, PANEL_Z], [x1, bottom, PANEL_Z], [x1, panelTop(x1), PANEL_Z], [x0, panelTop(x0), PANEL_Z], PANEL_GRAY, [0, 0.2, PANEL_Z - 1]);
-  }
-  for (const side of [-1, 1]) {
-    panel.quad([side * 0.5, bottom, PANEL_Z], [side * 0.55, bottom, PANEL_Z + 0.09], [side * 0.55, panelTop(0.55), PANEL_Z + 0.09], [side * 0.5, panelTop(0.5), PANEL_Z], PANEL_EDGE, [0, 0.2, PANEL_Z - 1]);
-  }
-  // Lower lip and knee bolster, sloping back down toward the floor.
-  panel.quad([-0.55, bottom, PANEL_Z + 0.09], [0.55, bottom, PANEL_Z + 0.09], [0.55, bottom, PANEL_Z], [-0.55, bottom, PANEL_Z], PANEL_EDGE, [0, 0, PANEL_Z]);
-  panel.quad([-0.53, -0.2, PANEL_Z - 0.06], [0.53, -0.2, PANEL_Z - 0.06], [0.53, bottom, PANEL_Z + 0.02], [-0.53, bottom, PANEL_Z + 0.02], 0x26282c, [0, -0.3, PANEL_Z - 0.5]);
-  addMesh(root, panel.build(), matte);
-
-  // Padded glareshield: a rounded lip over the panel that runs forward to the windshield.
-  const glare = new MeshBuilder();
-  const glareProfile: [number, number][] = [
-    [top - 0.012, PANEL_Z + 0.004],
-    [top + 0.006, PANEL_Z + 0.026],
-    [top + 0.026, PANEL_Z + 0.02],
-    [top + 0.034, PANEL_Z - 0.01],
-    [top + 0.04, PANEL_Z - 0.2],
-    [top + 0.048, PANEL_Z - 0.44],
-  ];
-  const glareSection = (x: number, inset: number): V3[] =>
-    glareProfile.map(([y, z]): V3 => [x, y - (top - panelTop(x)), z + inset]);
-  glare.loft(
-    [-0.56, -0.45, -0.25, 0, 0.25, 0.45, 0.56].map((x) => glareSection(x, Math.abs(x) > 0.5 ? 0.06 : 0)),
-    () => GLARESHIELD,
-  );
-  addMesh(root, glare.build(crease), new MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 }));
-
-  // ---- Instrument housings and small fittings ----
-  const fittings = new MeshBuilder();
-  const R = 0.04;
-  const sixPack: [GaugeName, number, number][] = [
-    ["asi", -0.388, 0.315],
-    ["ai", -0.27, 0.315],
-    ["alt", -0.152, 0.315],
-    ["tc", -0.388, 0.2],
-    ["hi", -0.27, 0.2],
-    ["vsi", -0.152, 0.2],
-  ];
-  const otherRound: [GaugeName, number, number, number][] = [
-    ["tach", -0.388, 0.085, R],
-    ["vor1", -0.035, 0.315, 0.036],
-    ["vor2", -0.035, 0.2, 0.036],
-    ["clock", -0.475, 0.315, 0.026],
-  ];
-  for (const [, x, y] of sixPack) {
-    instrumentBezel(fittings, x, y, R);
-  }
-  for (const [, x, y, r] of otherRound) {
-    instrumentBezel(fittings, x, y, r);
-  }
-  // Suction and ammeter: small static gauges under the clock.
-  for (const y of [0.2, 0.12]) {
-    instrumentBezel(fittings, -0.475, y, 0.022);
-    fittings.cap(ringZ(-0.475, y, PANEL_Z + 0.003, 0.022, 20), 0x0b0b0c, [-0.475, y, PANEL_Z - 1]);
-    fittings.box([-0.475, y + 0.006, PANEL_Z + 0.004], [0.002, 0.022, 0.001], 0xf2f2ee);
-  }
-  // Engine cluster and fuel gauges: rectangular housings.
-  // Engine cluster and fuel gauges sit in flat housings; their faces are drawn on top.
-  fittings.box([-0.215, 0.085, PANEL_Z + 0.004], [0.1, 0.1, 0.008], BEZEL);
-  fittings.box([0.355, 0.315, PANEL_Z + 0.004], [0.1, 0.1, 0.008], BEZEL);
-  // Annunciator strip above the six-pack.
-  fittings.box([-0.27, 0.395, PANEL_Z + 0.004], [0.34, 0.026, 0.008], 0x0b0b0c);
-  // Radio stack bay.
-  fittings.box([0.13, 0.225, PANEL_Z + 0.002], [0.19, 0.36, 0.004], 0x0d0e0f);
-  // Hobbs meter, ELT switch, and placards on the right.
-  fittings.box([0.45, 0.315, PANEL_Z + 0.004], [0.05, 0.022, 0.006], 0x0b0b0c);
-  fittings.box([0.45, 0.25, PANEL_Z + 0.006], [0.03, 0.03, 0.01], 0xb53228);
-  placard(fittings, 0.355, 0.24, 0.1, 0.016);
-  placard(fittings, 0.43, 0.19, 0.12, 0.03, 0xd9d6cc);
-  // Glovebox with latch.
-  fittings.box([0.38, 0.06, PANEL_Z + 0.004], [0.24, 0.11, 0.008], 0x34373c);
-  fittings.box([0.38, 0.1, PANEL_Z + 0.01], [0.05, 0.012, 0.006], CHROME);
-  // Circuit breaker panel.
-  fittings.box([0.37, -0.03, PANEL_Z + 0.003], [0.27, 0.035, 0.004], 0x2a2c30);
-  for (let i = 0; i < 11; i++) {
-    const x = 0.25 + i * 0.024;
-    fittings.loft([ringZ(x, -0.03, PANEL_Z + 0.003, 0.006, 8), ringZ(x, -0.03, PANEL_Z + 0.014, 0.0055, 8)], () => 0x0d0d0e);
-  }
-  // Rocker switches with the red master and alternator halves, legends above.
-  placard(fittings, -0.355, 0.028, 0.29, 0.014);
-  for (let i = 0; i < 9; i++) {
-    const x = -0.48 + i * 0.031;
-    fittings.box([x, -0.01, PANEL_Z + 0.004], [0.022, 0.04, 0.008], 0x0e0f10);
-    fittings.box([x, i % 3 === 1 ? -0.003 : -0.017, PANEL_Z + 0.012], [0.016, 0.019, 0.01], i < 2 ? 0xc0392b : 0xebe9e3);
-  }
-  // Magneto and starter key.
-  fittings.loft([ringZ(-0.475, 0.06, PANEL_Z, 0.017, 14), ringZ(-0.475, 0.06, PANEL_Z + 0.009, 0.015, 14)], () => CHROME);
-  fittings.box([-0.475, 0.064, PANEL_Z + 0.02], [0.007, 0.03, 0.02], 0x1b1b1b);
-  placard(fittings, -0.475, 0.09, 0.05, 0.01);
-  // Wet compass hanging from the top of the windshield frame.
-  // Wet compass sitting on the glareshield, with its mounting bracket beside it.
-  fittings.box([0.1, top + 0.07, PANEL_Z - 0.12], [0.07, 0.055, 0.06], 0x15171b);
-  fittings.box([0.1, top + 0.075, PANEL_Z - 0.0895], [0.05, 0.024, 0.002], 0xe9e3c8);
-  fittings.box([0.1, top + 0.075, PANEL_Z - 0.0885], [0.0015, 0.03, 0.002], 0xc0392b);
-  fittings.box([0.1, top + 0.04, PANEL_Z - 0.12], [0.04, 0.02, 0.05], 0x15171b);
-  // Fresh-air vents in the wing roots.
-  for (const side of [-1, 1]) {
-    const vent = (y: number, r: number) => ringZ(0, 0, 0, r, 12).map(([x, z]): V3 => [side * 0.47 + x, y, -0.4 + z]);
-    fittings.loft([vent(0.99, 0.02), vent(0.972, 0.018), vent(0.97, 0.009)], () => 0x8a8072);
-  }
-  // Throttle and mixture legends.
-  placard(fittings, 0.027, -0.012, 0.09, 0.01);
-  // Dome light and speaker grille.
-  fittings.box([0, 1.0, 0.25], [0.12, 0.02, 0.07], 0xdedad0);
-  fittings.box([0, 1.005, -0.25], [0.16, 0.012, 0.12], 0x2a2b2e);
-  // Double-sided: the flat bezel frames have no inside point to orient them by.
-  addMesh(root, fittings.build(crease), new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.3, side: DoubleSide }));
-
-  // ---- Live instrument faces ----
+  // Live gauge faces share one canvas atlas, redrawn ~30 times a second.
   const atlas = document.createElement("canvas");
   atlas.width = CELL * ATLAS_COLUMNS;
   atlas.height = CELL * ATLAS_ROWS;
   const ctx = atlas.getContext("2d");
-  const atlasTexture = new CanvasTexture(atlas);
-  atlasTexture.colorSpace = SRGBColorSpace;
-  atlasTexture.anisotropy = 8;
+  const atlasTexture = canvasTexture(atlas);
   const faceMaterial = new MeshBasicMaterial({ map: atlasTexture, toneMapped: false });
-  for (const [name, x, y] of sixPack) {
-    const face = new Mesh(mapToCell(new CircleGeometry(R, 40), CELLS[name]), faceMaterial);
-    face.position.set(x, y, PANEL_Z + 0.0025);
-    root.add(face);
-  }
-  for (const [name, x, y, r] of otherRound) {
-    const face = new Mesh(mapToCell(new CircleGeometry(r, 40), CELLS[name]), faceMaterial);
-    face.position.set(x, y, PANEL_Z + 0.0025);
-    root.add(face);
-  }
-  for (const [name, x, y] of [
-    ["engine", -0.215, 0.085],
-    ["fuel", 0.355, 0.315],
-  ] as const) {
-    const face = new Mesh(mapToCell(new PlaneGeometry(0.088, 0.088), CELLS[name]), faceMaterial);
-    face.position.set(x, y, PANEL_Z + 0.0085);
-    root.add(face);
-  }
 
-  // ---- Radio stack and annunciator (drawn once) ----
   const radios = document.createElement("canvas");
   radios.width = 256;
   radios.height = 480;
   drawRadios(radios);
-  const radioTexture = new CanvasTexture(radios);
-  radioTexture.colorSpace = SRGBColorSpace;
-  radioTexture.anisotropy = 8;
-  const radioFace = new Mesh(new PlaneGeometry(0.18, 0.34), new MeshBasicMaterial({ map: radioTexture, toneMapped: false }));
-  radioFace.position.set(0.13, 0.225, PANEL_Z + 0.0045);
-  root.add(radioFace);
-
   const annunciator = document.createElement("canvas");
   annunciator.width = 512;
   annunciator.height = 40;
   drawAnnunciator(annunciator);
-  const annunciatorTexture = new CanvasTexture(annunciator);
-  annunciatorTexture.colorSpace = SRGBColorSpace;
-  const annunciatorFace = new Mesh(new PlaneGeometry(0.33, 0.022), new MeshBasicMaterial({ map: annunciatorTexture, toneMapped: false }));
-  annunciatorFace.position.set(-0.27, 0.395, PANEL_Z + 0.0085);
-  root.add(annunciatorFace);
 
-  // ---- Engine controls: throttle, mixture; flap selector ----
-  const knob = (color: number, radius: number, ribbed: boolean): Object3D => {
-    const holder = new Object3D();
-    const g = new MeshBuilder();
-    g.beam([0, 0, -0.02], [0, 0, 0.1], 0.0045, 8, CHROME);
-    const sides = ribbed ? 16 : 12;
-    g.loft(
-      [
-        ringZ(0, 0, 0.095, radius * 0.75, sides),
-        ringZ(0, 0, 0.1, radius, sides),
-        ringZ(0, 0, 0.122, radius, sides),
-        ringZ(0, 0, 0.128, radius * 0.7, sides),
-      ],
-      (ring, segment) => (ribbed && ring === 1 && segment % 2 === 0 ? 0x2a2a2a : color),
-    );
-    holder.add(new Mesh(g.build(crease), satin));
-    return holder;
+  const nodes = new Map<string, Object3D>();
+  root.traverse((object) => {
+    nodes.set(object.name, object);
+    if (!(object instanceof Mesh)) {
+      return;
+    }
+    const geometry = object.geometry as BufferGeometry;
+    object.receiveShadow = true;
+    object.castShadow = false;
+    if (object.name.startsWith("gauge_")) {
+      const name = object.name.slice("gauge_".length);
+      if (isGaugeName(name)) {
+        const [column, row] = CELLS[name];
+        remapUv(geometry, column, row, ATLAS_COLUMNS, ATLAS_ROWS);
+        object.material = faceMaterial;
+      }
+    } else if (object.name === "radios") {
+      remapUv(geometry);
+      object.material = new MeshBasicMaterial({ map: canvasTexture(radios), toneMapped: false });
+    } else if (object.name === "annunciator") {
+      remapUv(geometry);
+      object.material = new MeshBasicMaterial({ map: canvasTexture(annunciator), toneMapped: false });
+    }
+  });
+
+  // Moving parts keep their modelled rest pose; updates are offsets from it.
+  const rest = (name: string) => {
+    const node = nodes.get(name);
+    return node ? { node, position: node.position.clone(), rotationX: node.rotation.x } : null;
   };
-  const throttle = knob(0x101010, 0.017, false);
-  throttle.position.set(0.0, 0.02, PANEL_Z - 0.1);
-  const mixture = knob(0xb02a20, 0.014, true);
-  mixture.position.set(0.055, 0.02, PANEL_Z - 0.1);
-  root.add(throttle, mixture);
-
-  const flapLever = new Object3D();
-  const flapGeo = new MeshBuilder();
-  flapGeo.box([0, 0, 0.014], [0.006, 0.006, 0.024], CHROME);
-  // The flap handle is shaped like a little wing.
-  flapGeo.box([0, 0, 0.032], [0.034, 0.014, 0.012], 0xefede6);
-  flapLever.add(new Mesh(flapGeo.build(), satin));
-  flapLever.position.set(0.255, 0.05, PANEL_Z);
-  root.add(flapLever);
-  const flapGate = new MeshBuilder();
-  flapGate.box([0.255, 0.02, PANEL_Z + 0.003], [0.01, 0.08, 0.004], 0x050505);
-  for (let i = 0; i < 4; i++) {
-    flapGate.box([0.276, 0.05 - i * 0.02, PANEL_Z + 0.003], [0.014, 0.0025, 0.002], 0xf4f4f0);
-  }
-  addMesh(root, flapGate.build(), matte);
-
-  // ---- Centre pedestal: trim wheel and indicator, fuel selector on the floor ----
-  const pedestal = new MeshBuilder();
-  pedestal.box([0, (FLOOR_Y + bottom) / 2 - 0.05, PANEL_Z + 0.12], [0.15, bottom - FLOOR_Y - 0.1, 0.24], 0x2b2d31);
-  pedestal.box([0.035, -0.165, PANEL_Z + 0.242], [0.02, 0.12, 0.004], 0x0b0b0c);
-  pedestal.box([0.035, -0.15, PANEL_Z + 0.245], [0.016, 0.006, 0.004], 0xf4f4f0);
-  pedestal.box([0, FLOOR_Y + 0.02, -0.38], [0.2, 0.02, 0.2], 0x2b2d31);
-  pedestal.cap(ringZ(0, 0, 0, 0.07, 16).map(([x, y]): V3 => [x, FLOOR_Y + 0.031, -0.38 + y]), 0x1d1e20, [0, FLOOR_Y, -0.38]);
-  pedestal.box([0, FLOOR_Y + 0.05, -0.38], [0.02, 0.04, 0.11], 0xd1b84a);
-  addMesh(root, pedestal.build(), matte);
-
-  const trimWheel = new Object3D();
-  const trimGeo = new MeshBuilder();
-  trimGeo.loft(
-    [
-      [-0.013, 0.07],
-      [-0.013, 0.08],
-      [0.013, 0.08],
-      [0.013, 0.07],
-    ].map(([x, r]) =>
-      Array.from({ length: 20 }, (_, k): V3 => {
-        const t = (k / 20) * Math.PI * 2;
-        return [x ?? 0, Math.cos(t) * (r ?? 0), Math.sin(t) * (r ?? 0)];
-      }),
-    ),
-    (_ring, segment) => (segment % 2 === 0 ? 0x1a1a1a : 0x2b2b2b),
+  const yokes = [rest("yoke_left"), rest("yoke_right")];
+  const throttle = rest("throttle");
+  const mixture = rest("mixture");
+  const flapLever = rest("flap_lever");
+  const trimWheel = rest("trim_wheel");
+  const pedals = (["left", "right"] as const).flatMap((seat) =>
+    (["l", "r"] as const).map((side) => ({ part: rest(`pedal_${seat}_${side}`), side: side === "l" ? -1 : 1 })),
   );
-  trimWheel.add(new Mesh(trimGeo.build(), matte));
-  trimWheel.position.set(-0.03, -0.12, PANEL_Z + 0.2);
-  root.add(trimWheel);
-
-  // ---- Yokes ----
-  const yokes: Object3D[] = [];
-  for (const x of [-0.27, 0.27]) {
-    const collar = new MeshBuilder();
-    collar.loft([ringZ(x, 0.13, PANEL_Z - 0.02, 0.028, 14), ringZ(x, 0.13, PANEL_Z + 0.012, 0.028, 14), ringZ(x, 0.13, PANEL_Z + 0.016, 0.018, 14)], () => BEZEL);
-    addMesh(root, collar.build(crease), matte);
-
-    const yoke = new Object3D();
-    const g = new MeshBuilder();
-    g.beam([0, 0, -0.42], [0, 0, -0.02], 0.011, 10, CHROME);
-    // Hub with a pale centre plate, then the ram's-horn grips.
-    g.loft([ringZ(0, 0, -0.03, 0.022, 14), ringZ(0, 0.004, 0.0, 0.034, 14), ringZ(0, 0.004, 0.018, 0.03, 14)], () => 0x121212);
-    g.cap(ringZ(0, 0.004, 0.0185, 0.024, 14), 0xd9d6ce, [0, 0, 0]);
-    const grip: V3[] = [
-      [0.025, 0.0, 0.006],
-      [0.08, -0.012, 0.01],
-      [0.118, 0.0, 0.01],
-      [0.135, 0.04, 0.008],
-      [0.138, 0.085, 0.004],
-      [0.128, 0.115, 0.0],
-    ];
-    for (const side of [-1, 1]) {
-      for (let k = 0; k + 1 < grip.length; k++) {
-        const a = grip[k];
-        const b = grip[k + 1];
-        if (a && b) {
-          const radius = k >= 2 ? 0.017 : 0.013;
-          g.beam([side * a[0], a[1], a[2]], [side * b[0], b[1], b[2]], radius, 10, 0x141414, k >= 2 ? 0.017 : radius);
-        }
-      }
-    }
-    // Push-to-talk and trim switches on the left horn.
-    g.box([-0.13, 0.07, 0.022], [0.012, 0.012, 0.008], 0xb02a20);
-    yoke.add(new Mesh(g.build(crease), satin));
-    yoke.position.set(x, 0.13, PANEL_Z + 0.26);
-    root.add(yoke);
-    yokes.push(yoke);
-  }
-
-  // ---- Rudder pedals with toe brakes ----
-  const pedals: Object3D[] = [];
-  for (const seatX of [-0.27, 0.27]) {
-    for (const side of [-1, 1]) {
-      const pedal = new Object3D();
-      const p = new MeshBuilder();
-      p.beam([0, 0.13, -0.05], [0, 0.0, 0.0], 0.007, 6, CHROME);
-      p.box([0, 0.0, 0.0], [0.075, 0.12, 0.014], 0x1c1d1f);
-      for (let k = 0; k < 4; k++) {
-        p.box([0, -0.04 + k * 0.025, 0.009], [0.07, 0.006, 0.004], 0x55585d);
-      }
-      pedal.add(new Mesh(p.build(), satin));
-      pedal.rotation.x = -0.55;
-      pedal.position.set(seatX + side * 0.085, FLOOR_Y + 0.1, -0.93);
-      root.add(pedal);
-      pedals.push(pedal);
-    }
-  }
-
-  // ---- Seats, floor, and the rear bench ----
-  const seats = new MeshBuilder();
-  for (const x of [-0.27, 0.27]) {
-    // Cushion with a rolled front edge.
-    seats.loft(
-      [
-        [0.24, 0.0],
-        [0.26, 0.05],
-        [0.24, 0.07],
-      ].map(([z, y]) => roundedSquare(0, 0, 0, 0.22, 0.05).map(([px, pz]): V3 => [x + px, FLOOR_Y + 0.22 + (y ?? 0), -0.02 + pz * ((z ?? 0) / 0.22)])),
-      () => LEATHER,
-    );
-    seats.box([x, FLOOR_Y + 0.29, 0.0], [0.38, 0.02, 0.36], LEATHER_DARK);
-    // Backrest with inserts and a headrest.
-    seats.box([x, FLOOR_Y + 0.62, 0.3], [0.44, 0.66, 0.1], LEATHER);
-    seats.box([x, FLOOR_Y + 0.62, 0.247], [0.3, 0.56, 0.01], LEATHER_DARK);
-    for (let k = 0; k < 5; k++) {
-      seats.box([x, FLOOR_Y + 0.4 + k * 0.1, 0.24], [0.3, 0.008, 0.004], 0x4a463f);
-    }
-    seats.box([x, FLOOR_Y + 1.03, 0.31], [0.24, 0.14, 0.08], LEATHER);
-    // Seat rails and frame.
-    for (const dx of [-0.15, 0.15]) {
-      seats.box([x + dx, FLOOR_Y + 0.1, 0.0], [0.03, 0.2, 0.42], 0x333333);
-      seats.box([x + dx, FLOOR_Y + 0.012, -0.05], [0.02, 0.02, 0.8], 0x777a7e);
-    }
-    // Lap belt and shoulder harness lying on the seat.
-    seats.box([x - 0.1, FLOOR_Y + 0.3, 0.05], [0.04, 0.006, 0.36], 0x3c4048);
-    seats.box([x + 0.08, FLOOR_Y + 0.66, 0.243], [0.045, 0.6, 0.006], 0x3c4048);
-  }
-  seats.box([0, FLOOR_Y + 0.22, 1.02], [1.0, 0.12, 0.46], LEATHER);
-  seats.box([0, FLOOR_Y + 0.6, 1.26], [1.0, 0.64, 0.1], LEATHER);
-  seats.box([0, FLOOR_Y - 0.01, -0.15], [1.06, 0.03, 2.4], CARPET);
-  // Firewall kick panel under the panel.
-  seats.quad([-0.53, FLOOR_Y, -0.82], [0.53, FLOOR_Y, -0.82], [0.53, -0.2, -0.93], [-0.53, -0.2, -0.93], 0x3a3832, [0, 0, -0.5]);
-  addMesh(root, seats.build(crease), soft);
-
-  // ---- Door trim: armrests, handles, map pockets ----
-  const doors = new MeshBuilder();
-  for (const side of [-1, 1]) {
-    const x = side * 0.5;
-    doors.box([x, 0.13, -0.02], [0.06, 0.05, 0.46], 0xb3a68f);
-    doors.box([side * 0.505, 0.3, -0.28], [0.03, 0.025, 0.12], CHROME);
-    doors.box([side * 0.52, -0.08, -0.1], [0.02, 0.16, 0.4], 0xa39782);
-    doors.box([side * 0.49, 0.22, 0.36], [0.03, 0.04, 0.05], 0xb3a68f);
-  }
-  addMesh(root, doors.build(crease), soft);
+  const offset = new Vector3();
 
   let lastDraw = -1;
-
   return {
     root,
+    pilot: nodes.get("pilot") ?? null,
     update(state) {
       const now = performance.now();
       if (ctx && now - lastDraw > 33) {
@@ -504,62 +169,31 @@ export function buildCockpit(): Cockpit {
       }
       const pull = Math.max(-1, Math.min(1, state.elevator));
       for (const yoke of yokes) {
-        yoke.position.z = PANEL_Z + 0.26 + pull * 0.09;
-        yoke.rotation.z = -state.aileron * 0.8;
+        if (yoke) {
+          yoke.node.position.copy(yoke.position).add(offset.set(0, 0, pull * 0.09));
+          yoke.node.rotation.z = -state.aileron * 0.8;
+        }
       }
-      throttle.position.z = PANEL_Z - 0.1 + (1 - state.throttle) * 0.06;
-      flapLever.position.y = 0.05 - (state.flapNotch / 3) * 0.06;
-      trimWheel.rotation.x = -pull * 0.6;
-      pedals.forEach((pedal, i) => {
-        const side = i % 2 === 0 ? -1 : 1;
-        pedal.position.z = -0.93 - side * state.rudder * 0.05;
-        pedal.rotation.x = -0.55 - state.brake * 0.25;
-      });
+      if (throttle) {
+        // Pushed in for full power, pulled toward you at idle.
+        throttle.node.position.copy(throttle.position).add(offset.set(0, 0, (1 - state.throttle) * 0.06));
+      }
+      if (mixture) {
+        mixture.node.position.copy(mixture.position);
+      }
+      if (flapLever) {
+        flapLever.node.position.copy(flapLever.position).add(offset.set(0, -(state.flapNotch / 3) * 0.06, 0));
+      }
+      if (trimWheel) {
+        trimWheel.node.rotation.x = trimWheel.rotationX - pull * 0.6;
+      }
+      for (const { part, side } of pedals) {
+        if (part) {
+          part.node.rotation.x = part.rotationX + side * state.rudder * 0.22 - state.brake * 0.12;
+        }
+      }
     },
   };
-}
-
-/**
- * The cabin's inner shell, built from the fuselage stations: headliner,
- * sidewalls, and darker trim around every window opening. Rendered from the
- * inside (back faces), so it never shows from outside the aircraft.
- */
-export function cabinLining(rings: readonly (readonly V3[])[], isWindow: (band: number, segment: number) => boolean, fromBand: number, toBand: number): Mesh {
-  const lining = new MeshBuilder();
-  const inset = (p: V3): V3 => [p[0] * 0.955, p[1] * 0.975 + 0.008, p[2]];
-  for (let band = fromBand; band < toBand; band++) {
-    const a = rings[band];
-    const b = rings[band + 1];
-    if (!a || !b) {
-      continue;
-    }
-    const inside: V3 = [0, 0.3, (( a[0]?.[2] ?? 0) + (b[0]?.[2] ?? 0)) / 2];
-    for (let i = 0; i < a.length; i++) {
-      if (isWindow(band, i)) {
-        continue;
-      }
-      const j = (i + 1) % a.length;
-      const [a0, a1, b0, b1] = [a[i], a[j], b[i], b[j]];
-      if (!a0 || !a1 || !b0 || !b1) {
-        continue;
-      }
-      const prev = (i - 1 + a.length) % a.length;
-      const next = j;
-      const y = (a0[1] + a1[1]) / 2;
-      // Dark trim on the slim pillars between windows and along each opening's edges.
-      const pillar = (band === 6 || band === 8) && y > 0.3;
-      const nearWindow = pillar || isWindow(band, prev) || isWindow(band, next);
-      // Forward of the doors the walls are dark like the panel sides; behind, light upholstery.
-      const forward = band <= 5;
-      // Ahead of the A-pillar everything reads as part of the dark glareshield.
-      const color = forward && !pillar ? GLARESHIELD : nearWindow ? 0xbcae96 : y > 0.95 ? 0xd8cdb9 : y > 0.35 ? 0xcabda6 : 0x9d927f;
-      lining.quad(inset(a0), inset(a1), inset(b1), inset(b0), color, inside);
-    }
-  }
-  const mesh = new Mesh(lining.build(30), new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: BackSide }));
-  mesh.name = "cabin-lining";
-  mesh.receiveShadow = true;
-  return mesh;
 }
 
 // ---------------------------------------------------------------------------
