@@ -463,7 +463,11 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
       skin.beam([a[0], a[1] + 0.001, a[2]], [b[0], b[1] + 0.001, b[2]], 0.004, 4, SEAM);
     }
   }
-  add(skin.build(CREASE), paint);
+  // Double-sided, so from inside any sliver between the lining and a window
+  // edge shows painted skin instead of the outdoors.
+  const skinPaint = paint.clone();
+  skinPaint.side = DoubleSide;
+  add(skin.build(CREASE), skinPaint);
   const windows = add(glazing.build(CREASE), glass, true, false);
   windows.renderOrder = 2;
 

@@ -107,8 +107,8 @@ const ROADS: Record<string, { minZoom: number; width: number; color: number }> =
   trunk: { minZoom: 11, width: 20, color: 0x85878b },
   primary: { minZoom: 12, width: 15, color: 0x8c8e92 },
   secondary: { minZoom: 13, width: 12, color: 0x95979a },
-  tertiary: { minZoom: 14, width: 10, color: 0x9a9b9d },
-  minor: { minZoom: 14, width: 8, color: 0xa3a4a1 },
+  tertiary: { minZoom: 13, width: 10, color: 0x9a9b9d },
+  minor: { minZoom: 13, width: 8, color: 0xa3a4a1 },
 };
 
 function features(layer: VectorTileLayer | undefined): VectorTileFeature[] {

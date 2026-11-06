@@ -660,7 +660,12 @@ export function buildTile(input: TileInputs): TileGeometry {
       const areaMeters = Math.abs(polygonArea(ring)) * metersPerUnit * metersPerUnit;
       const height = Math.max(3, buildingHeight);
       // Coarser tiles further out keep only the buildings that shape the skyline.
-      if (z < 14 && height < 12 && areaMeters < 500) {
+      if (!generated && z < 14 && height < 12 && areaMeters < 500) {
+        return false;
+      }
+      // Very tall slivers are masts and tower parts mapped as buildings; they
+      // render as stacks of boxes, so leave them out.
+      if (!generated && height > 50 && areaMeters < 200) {
         return false;
       }
       const centerLat = tileYToLat(y + cy / extent, z);
@@ -807,7 +812,8 @@ export function buildTile(input: TileInputs): TileGeometry {
     // The free map data leaves out most houses, so neighbourhoods are filled
     // the way flight sims usually do it: lots along real streets, each with
     // a small house facing the road, seeded so they're the same every visit.
-    if (z >= 14) {
+    // The next ring out (zoom 13) gets them too, so streets in the distance aren't bare.
+    if (z >= 13) {
       generateHouses(features.roads, emitBuilding, isOccupied, markOccupied, coverAt, extent, metersPerUnit, x, y);
     }
 

@@ -632,7 +632,7 @@ export class Simulation {
       flapDeg: a.flapDeg,
       flapNotch: c.flapNotch,
       brake: c.brake > 0,
-      stall: a.stallWarning > 0.6 && !a.onGround,
+      stall: a.stallWarning > 0.35 && !a.onGround,
       onGround: a.onGround,
       yokeX: c.aileron,
       yokeY: c.elevator,

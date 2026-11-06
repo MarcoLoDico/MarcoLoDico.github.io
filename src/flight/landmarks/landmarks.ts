@@ -52,7 +52,10 @@ export class Landmarks {
   }
 
   static exclusions(): Exclusion[] {
-    return ALL.filter((spec) => spec.exclusionRadius > 0).map((spec) => ({ lat: spec.lat, lon: spec.lon, radius: spec.exclusionRadius }));
+    return ALL.flatMap((spec) => [
+      ...(spec.exclusionRadius > 0 ? [{ lat: spec.lat, lon: spec.lon, radius: spec.exclusionRadius }] : []),
+      ...(spec.extraExclusions ?? []),
+    ]);
   }
 
   setFrame(frame: LocalFrame): void {

@@ -2,6 +2,7 @@ import { Mesh, Object3D } from "three";
 import { circle, MeshBuilder, type V3 } from "../render/meshBuilder";
 import { landmarkMaterial } from "./material";
 import { lathe } from "./toronto";
+import { offsetLatLon } from "../sim/geo";
 import { rotateYaw, type Collider, type LandmarkSpec } from "./types";
 
 const ORANGE = 0xc0392b;
@@ -134,6 +135,51 @@ function bridgeBox(s: number, halfX: number, halfZ: number, bottom: number, top:
   return { kind: "box", x, z, halfX, halfZ, yaw: BRIDGE_YAW, bottom, top };
 }
 
+/**
+ * Sutro Tower, 298 m: three legs in red-and-white aviation bands, braced by
+ * two triangular crossarm levels whose arms reach past the legs, with
+ * antenna masts on top.
+ */
+function buildSutroTower(): Object3D {
+  const b = new MeshBuilder();
+  const RED = 0xc8202e;
+  const WHITE = 0xeeeeea;
+  const legAt = (k: number, y: number): V3 => {
+    const a = ((90 + k * 120) * Math.PI) / 180;
+    const r = 24 - (y / 255) * 9;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  };
+  for (let k = 0; k < 3; k++) {
+    // Each leg is a tapering prism, banded in 21 m sections.
+    for (let y = 0; y < 255; y += 21) {
+      const y1 = Math.min(255, y + 21);
+      b.beam(legAt(k, y), legAt(k, y1), 2.6 - (y / 255) * 1.2, 4, Math.floor(y / 21) % 2 === 0 ? RED : WHITE, 2.6 - (y1 / 255) * 1.2);
+    }
+    // Antenna masts on top of each leg.
+    const top = legAt(k, 255);
+    b.beam(top, [top[0] * 0.9, 298 - k * 6, top[2] * 0.9], 0.9, 4, k === 0 ? RED : WHITE, 0.35);
+  }
+  for (const level of [160, 236]) {
+    for (let k = 0; k < 3; k++) {
+      const a = legAt(k, level);
+      const c = legAt((k + 1) % 3, level);
+      b.beam(a, c, 1.4, 4, RED);
+      // Arms reaching out past each leg, the tower's "pitchfork" silhouette.
+      b.beam(a, [a[0] * 1.55, level, a[2] * 1.55], 1.1, 4, WHITE);
+    }
+  }
+  // Diagonal bracing between the legs low down.
+  for (let k = 0; k < 3; k++) {
+    b.beam(legAt(k, 10), legAt((k + 1) % 3, 80), 0.8, 4, WHITE);
+    b.beam(legAt((k + 1) % 3, 10), legAt(k, 80), 0.8, 4, WHITE);
+  }
+  const mesh = new Mesh(b.build(), landmarkMaterial);
+  mesh.castShadow = true;
+  const group = new Object3D();
+  group.add(mesh);
+  return group;
+}
+
 /** Transamerica Pyramid, 260 m: a tapering four-sided tower with a spire and side "wings". */
 function buildTransamerica(): Object3D {
   const b = new MeshBuilder();
@@ -207,6 +253,11 @@ export const sanFranciscoLandmarks: readonly LandmarkSpec[] = [
     lat: 37.819725,
     lon: -122.47873,
     exclusionRadius: 0,
+    // OSM maps the towers as tall "buildings"; clear them so they don't show inside ours.
+    extraExclusions: [-TOWER_S, TOWER_S, -ANCHOR_S, ANCHOR_S].map((s) => ({
+      ...offsetLatLon({ lat: 37.819725, lon: -122.47873 }, 354.7, s),
+      radius: 45,
+    })),
     baseAltitude: 0,
     build: buildGoldenGate,
     colliders: [
@@ -227,6 +278,16 @@ export const sanFranciscoLandmarks: readonly LandmarkSpec[] = [
         top: DECK_TOP,
       },
     ],
+  },
+  {
+    id: "sutro-tower",
+    name: "Sutro Tower",
+    lat: 37.7552,
+    lon: -122.45286,
+    exclusionRadius: 70,
+    baseAltitude: null,
+    build: buildSutroTower,
+    colliders: [{ kind: "cylinder", x: 0, z: 0, radius: 26, bottom: -10, top: 298 }],
   },
   {
     id: "transamerica-pyramid",

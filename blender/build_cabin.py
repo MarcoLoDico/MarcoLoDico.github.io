@@ -365,7 +365,7 @@ def is_window(band, segment):
 
 def build_lining():
     part = Part("cabin_lining")
-    inset_x, inset_y = 0.972, 0.978
+    inset_x, inset_y = 0.968, 0.978
     rings = [section_ring(s) for s in STATIONS]
     first_band, last_band = 4, 11
     verts = {}
@@ -421,12 +421,13 @@ def build_lining():
         outward = Vector((c.x - center.x, 0, c.z - center.z))
         if f.normal.dot(outward) > 0:
             f.normal_flip()
-    # Solidify into the cabin gives the window openings a real frame depth
-    # without pushing through the skin.
+    # Solidify outward, most of the way to the skin (the gap is 1.2–1.6 cm,
+    # narrowest at the tapering rear), so the window openings have framed
+    # depth; the double-sided skin covers the last few millimetres.
     return part.finish(
         smooth_angle=35,
         recalc=False,
-        modifiers=[("SOLIDIFY", {"thickness": 0.014, "offset": 1.0, "use_rim": True}), bevel(0.005, 2, 30)],
+        modifiers=[("SOLIDIFY", {"thickness": 0.009, "offset": -1.0, "use_rim": True}), bevel(0.004, 2, 30)],
     )
 
 

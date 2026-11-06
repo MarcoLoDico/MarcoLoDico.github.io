@@ -35,6 +35,8 @@ export interface LandmarkSpec {
   readonly lon: number;
   /** OSM buildings within this radius are left out so they don't overlap the model. */
   readonly exclusionRadius: number;
+  /** More spots to clear of OSM buildings, for landmarks spread over a distance (bridge towers). */
+  readonly extraExclusions?: readonly { readonly lat: number; readonly lon: number; readonly radius: number }[];
   /** Fixed base altitude in metres, or null to sit on the terrain. */
   readonly baseAltitude: number | null;
   readonly build: () => Object3D;

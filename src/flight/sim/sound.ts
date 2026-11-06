@@ -119,10 +119,10 @@ export class FlightSound {
     this.engineGain.gain.setTargetAtTime(running ? 0.16 + throttle * 0.22 : 0, t, 0.1);
     this.wind.gain.setTargetAtTime(running ? Math.min(0.35, (airspeed / 60) ** 2 * 0.25) : 0, t, 0.15);
     this.windFilter.frequency.setTargetAtTime(300 + airspeed * 18, t, 0.15);
-    // The reed starts weak and low as the warning begins, then screams.
-    const warning = running ? Math.max(0, Math.min(1, (stallWarning - 0.15) / 0.85)) : 0;
-    this.horn.gain.setTargetAtTime(warning * warning * 0.11, t, 0.04);
-    this.hornReed?.frequency.setTargetAtTime(1_550 + warning * 350, t, 0.08);
+    // The reed starts as a thin squeal as the warning begins, then screams.
+    const warning = running ? Math.max(0, Math.min(1, stallWarning)) : 0;
+    this.horn.gain.setTargetAtTime(warning > 0.02 ? 0.03 + warning ** 1.3 * 0.1 : 0, t, 0.04);
+    this.hornReed?.frequency.setTargetAtTime(1_500 + warning * 450, t, 0.08);
   }
 
   dispose(): void {

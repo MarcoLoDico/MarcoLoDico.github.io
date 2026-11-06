@@ -63,6 +63,8 @@ export class Aircraft {
   airspeed = 0;
   indicatedAirspeed = 0;
   stallWarning = 0;
+  /** Height of the wing above the ground, for ground effect; Infinity when far up. */
+  wingHeight = Infinity;
   onGround = false;
   wheelLoad = 0;
   crashed: CrashCause | null = null;
@@ -132,6 +134,7 @@ export class Aircraft {
     this.torque.set(0, 0, 0);
 
     const altitude = this.altitude();
+    this.measureWingHeight(ground);
     const rho = airDensity(altitude);
     this.applyEngine(controls, rho, dt);
     this.applyAerodynamics(rho);
@@ -141,6 +144,16 @@ export class Aircraft {
       return;
     }
     this.integrate(dt);
+  }
+
+  /** The wing sits about 1.1 m above the centre of gravity on a high-wing 172. */
+  private measureWingHeight(ground: GroundProbe): void {
+    this.pointWorld.copy(this.position);
+    if (ground.probe(this.pointWorld, this.contact)) {
+      this.wingHeight = Math.max(0, -this.contact.depth + 1.1);
+    } else {
+      this.wingHeight = Infinity;
+    }
   }
 
   /** Re-reads the field: the ground pass can set it after the check at the top of step(). */
@@ -249,10 +262,21 @@ export class Aircraft {
       cl = lerp(lift.minimum, Math.min(flatPlate, lift.minimum * 0.7), stall);
     }
     cl += lift.perPitchRate * qRate + lift.perElevator * elevatorRad;
-    this.stallWarning = smoothstep(stallAlpha - 0.09, stallAlpha - 0.01, alpha);
+    // The 172's stall warning is a reed horn fed by a slot in the left wing's
+    // leading edge: it starts to sound around 5–10 kt above the stall, i.e.
+    // once the wing is working at roughly three quarters of its maximum lift.
+    const liftFraction = (cl0 + lift.perAlpha * alpha) / clMax;
+    this.stallWarning = smoothstep(0.7, 0.93, liftFraction);
+
+    // Ground effect: within about a wingspan of the runway the ground blocks
+    // the wingtip vortices, cutting induced drag and adding a little lift —
+    // why a 172 floats in the flare.
+    const span = this.wingHeight / b;
+    const groundFactor = span < 1.5 ? (16 * span) ** 2 / (1 + (16 * span) ** 2) : 1;
+    cl *= 1 + 0.1 * (1 - groundFactor);
 
     const cd =
-      drag.parasite + drag.induced * Math.min(cl, clMax) ** 2 + drag.fullFlaps * flap + 1.25 * stall * Math.sin(alpha) ** 2;
+      drag.parasite + drag.induced * groundFactor * Math.min(cl, clMax) ** 2 + drag.fullFlaps * flap + 1.25 * stall * Math.sin(alpha) ** 2;
     const cy = C172.side.perBeta * beta + C172.side.perRudder * rudderRad * (tailQ / qbar);
 
     // A stalled wing loses roll damping and one side lets go first, so the
