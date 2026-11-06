@@ -209,6 +209,18 @@ function clipHalfPlane(points: readonly [number, number][], a: [number, number],
   return out;
 }
 
+function pointInRing(points: readonly VectorPoint[], px: number, py: number): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i];
+    const b = points[j];
+    if (a && b && a.y > py !== b.y > py && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 /** Signed area (shoelace) of a polygon, in its own units squared. */
 function polygonArea(points: readonly VectorPoint[]): number {
   let area = 0;
@@ -681,9 +693,11 @@ export function buildTile(input: TileInputs): TileGeometry {
         const [u, v] = toUv(p);
         return place(u, v, bottom);
       });
-      const inside = place(cu, cv, (top + bottom) / 2);
 
       // Walls, with facade coordinates running round the building and up it.
+      // Each wall faces outward by the footprint's winding, not a centre
+      // point, which can sit outside some walls of L- and U-shaped buildings.
+      const winding = Math.sign(polygonArea(ring)) || 1;
       let along = 0;
       for (let k = 0; k < ring.length; k++) {
         const k2 = (k + 1) % ring.length;
@@ -701,8 +715,16 @@ export function buildTile(input: TileInputs): TileGeometry {
         const u1 = u0 + wallLength;
         along += wallLength;
         const low = bottom - base;
-        buildingsOut.triFacing(b0, b1, t1, wall, 1, inside, [u0, low], [u1, low], [u1, height]);
-        buildingsOut.triFacing(b0, t1, t0, wall, 1, inside, [u0, low], [u1, height], [u0, height]);
+        const ex = pk2.x - pk.x;
+        const ey = pk2.y - pk.y;
+        const len = Math.hypot(ex, ey) || 1;
+        const inward: VectorPoint = {
+          x: (pk.x + pk2.x) / 2 - ((winding * ey) / len) * metersToUnits,
+          y: (pk.y + pk2.y) / 2 + ((winding * ex) / len) * metersToUnits,
+        };
+        const wallInside = place(inward.x / extent, inward.y / extent, (top + bottom) / 2);
+        buildingsOut.triFacing(b0, b1, t1, wall, 1, wallInside, [u0, low], [u1, low], [u1, height]);
+        buildingsOut.triFacing(b0, t1, t0, wall, 1, wallInside, [u0, low], [u1, height], [u0, height]);
       }
 
       const box = style === 0 && height <= 12 && areaMeters <= 320 && ring.length <= 14 ? orientedBox(ring) : null;
@@ -743,11 +765,13 @@ export function buildTile(input: TileInputs): TileGeometry {
           const pb = roofPoints[face[1] ?? 0];
           const pc = roofPoints[face[2] ?? 0];
           if (pa && pb && pc) {
-            buildingsOut.triFacing(pa, pb, pc, flatRoof, 1, inside);
+            // Roofs face up; the tile's local y is up.
+            buildingsOut.triFacing(pa, pb, pc, flatRoof, 1, null);
           }
         }
         // Mechanical rooms and plant on big flat roofs.
-        if (height >= 15 && areaMeters >= 400) {
+        // Only where the centre is on the roof: on L- and U-shaped buildings it may not be.
+        if (height >= 15 && areaMeters >= 400 && pointInRing(ring, cx, cy)) {
           const size = Math.min(16, Math.sqrt(areaMeters) * 0.32) * metersToUnits;
           const unitHeight = 2.5 + seed * 2.5;
           rooftopBox(buildingsOut, (px, py, h) => place(px / extent, py / extent, h), cx, cy, size, top, top + unitHeight, 0x8a8a88);
