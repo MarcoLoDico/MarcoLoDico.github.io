@@ -801,7 +801,26 @@ export function buildTile(input: TileInputs): TileGeometry {
       return true;
     };
 
+    // A raised part (min height above ground) with nothing mapped under it
+    // would float in the air, so it's only kept when another building holds it up.
+    const supported = (part: TileFeatures["buildings"][number]): boolean => {
+      let cx = 0;
+      let cy = 0;
+      for (const p of part.ring) {
+        cx += p.x;
+        cy += p.y;
+      }
+      cx /= part.ring.length;
+      cy /= part.ring.length;
+      return features.buildings.some(
+        (other) => other !== part && other.minHeight < part.minHeight && other.height >= part.minHeight - 3 && pointInRing(other.ring, cx, cy),
+      );
+    };
+
     for (const building of features.buildings) {
+      if (building.minHeight > 3 && !supported(building)) {
+        continue;
+      }
       const ring = simplifyRing(building.ring, 1.5 * metersToUnits);
       if (ring.length >= 3 && emitBuilding(ring, building.height, building.minHeight, false)) {
         markOccupied(ring, 3 * metersToUnits);
