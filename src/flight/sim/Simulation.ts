@@ -125,6 +125,7 @@ export class Simulation {
   /** Dev-only: fly without pointer lock, for automated testing. */
   testMode = false;
   private status: SimStatus = "menu";
+  private returnTo: "loading" | "paused" | null = null;
   /** Set by a click on Fly or "Click to fly"; the sim flies once the mouse is engaged. */
   private wantsToFly = false;
   private view: ViewMode = "cockpit";
@@ -251,10 +252,23 @@ export class Simulation {
     this.sound.start();
   }
 
-  openMenu(): void {
+  /** Opens the start menu; returns whether the flight underneath can be continued. */
+  openMenu(): boolean {
+    const interrupted = this.status === "loading" || this.status === "paused" || this.status === "flying";
+    this.returnTo = interrupted ? (this.status === "loading" ? "loading" : "paused") : null;
     this.status = "menu";
     this.wantsToFly = false;
     this.input.disengage();
+    return interrupted;
+  }
+
+  /** Closes the menu back into the flight it interrupted. */
+  continueFlight(): void {
+    if (this.returnTo) {
+      this.status = this.returnTo;
+      this.returnTo = null;
+      this.resume();
+    }
   }
 
   setView(view: ViewMode): void {

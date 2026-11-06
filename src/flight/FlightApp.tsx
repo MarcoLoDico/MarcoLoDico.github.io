@@ -38,6 +38,8 @@ export function FlightApp() {
   const simRef = useRef<Simulation | null>(null);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [menuOpen, setMenuOpen] = useState(true);
+  // Opening the menu mid-flight keeps that flight around to continue.
+  const [canContinue, setCanContinue] = useState(false);
   const [view, setView] = useState<ViewMode>("cockpit");
   // A "Fly here" link from the main site preselects that place: ?start=place-shopify.
   const [selected, setSelected] = useState<Start>(
@@ -64,16 +66,36 @@ export function FlightApp() {
     };
   }, [error]);
 
+  const openMenu = () => {
+    setCanContinue(simRef.current?.openMenu() ?? false);
+    setMenuOpen(true);
+  };
+
+  const continueFlight = () => {
+    const sim = simRef.current;
+    if (!sim) {
+      return;
+    }
+    sim.setView(view);
+    sim.continueFlight();
+    setCanContinue(false);
+    setMenuOpen(false);
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.code === "Escape" && !menuOpen && telemetry && telemetry.status !== "flying") {
-        setMenuOpen(true);
-        simRef.current?.openMenu();
+      if (event.code !== "Escape") {
+        return;
+      }
+      if (!menuOpen && telemetry && telemetry.status !== "flying") {
+        openMenu();
+      } else if (menuOpen && canContinue) {
+        continueFlight();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen, telemetry]);
+  });
 
   const fly = () => {
     const sim = simRef.current;
@@ -83,6 +105,7 @@ export function FlightApp() {
     sim.setView(view);
     sim.begin(selected);
     sim.resume();
+    setCanContinue(false);
     setMenuOpen(false);
   };
 
@@ -120,10 +143,7 @@ export function FlightApp() {
             <button
               type="button"
               className="flight-chip"
-              onClick={() => {
-                setMenuOpen(true);
-                simRef.current?.openMenu();
-              }}
+              onClick={openMenu}
             >
               Menu
             </button>
@@ -213,10 +233,7 @@ export function FlightApp() {
                 <button
                   type="button"
                   className="flight-button"
-                  onClick={() => {
-                    setMenuOpen(true);
-                    simRef.current?.openMenu();
-                  }}
+                  onClick={openMenu}
                 >
                   Choose another start
                 </button>
@@ -276,14 +293,25 @@ export function FlightApp() {
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className="flight-button flight-button--primary flight-button--large"
-                onClick={fly}
-                disabled={error !== null}
-              >
-                Fly
-              </button>
+              <div className="flight-menu__actions">
+                {canContinue && (
+                  <button
+                    type="button"
+                    className="flight-button flight-button--primary flight-button--large"
+                    onClick={continueFlight}
+                  >
+                    Continue flight
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`flight-button flight-button--large${canContinue ? "" : " flight-button--primary"}`}
+                  onClick={fly}
+                  disabled={error !== null}
+                >
+                  {canContinue ? "New flight" : "Fly"}
+                </button>
+              </div>
             </div>
 
             <h2 className="flight-menu__heading">Controls</h2>
