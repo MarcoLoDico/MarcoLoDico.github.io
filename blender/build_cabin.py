@@ -359,7 +359,7 @@ def is_window(band, segment):
 
 def build_lining():
     part = Part("cabin_lining")
-    inset_x, inset_y = 0.955, 0.975
+    inset_x, inset_y = 0.972, 0.978
     rings = [section_ring(s) for s in STATIONS]
     first_band, last_band = 4, 11
     verts = {}
@@ -418,7 +418,7 @@ def build_lining():
     return part.finish(
         smooth_angle=35,
         recalc=False,
-        modifiers=[("SOLIDIFY", {"thickness": 0.022, "offset": 1.0, "use_rim": True}), bevel(0.006, 2, 30)],
+        modifiers=[("SOLIDIFY", {"thickness": 0.014, "offset": 1.0, "use_rim": True}), bevel(0.005, 2, 30)],
     )
 
 
@@ -427,32 +427,33 @@ def build_lining():
 # ---------------------------------------------------------------------------
 
 PANEL_Z = -0.86
+YOKE_Y = 0.15
 PANEL_BOTTOM = -0.06
 # The cabin wall is about 0.52 m out at panel height, so the panel runs right to it.
-PANEL_HALF_WIDTH = 0.515
+PANEL_HALF_WIDTH = 0.5
 FLOOR_Y = -0.3
 
 
 def panel_top(x):
-    return 0.43 - x * x * 0.26
+    return 0.46 - x * x * 0.14
 
 
 GAUGES = {
     # name: (x, y, radius)
-    "asi": (-0.388, 0.315, 0.04),
-    "ai": (-0.27, 0.315, 0.04),
-    "alt": (-0.152, 0.315, 0.04),
-    "tc": (-0.388, 0.2, 0.04),
-    "hi": (-0.27, 0.2, 0.04),
-    "vsi": (-0.152, 0.2, 0.04),
-    "tach": (-0.388, 0.085, 0.04),
-    "vor1": (-0.035, 0.315, 0.036),
-    "vor2": (-0.035, 0.2, 0.036),
-    "clock": (-0.475, 0.315, 0.026),
-    "suction": (-0.475, 0.2, 0.022),
-    "ammeter": (-0.475, 0.12, 0.022),
+    "asi": (-0.388, 0.345, 0.04),
+    "ai": (-0.27, 0.345, 0.04),
+    "alt": (-0.152, 0.345, 0.04),
+    "tc": (-0.388, 0.23, 0.04),
+    "hi": (-0.27, 0.23, 0.04),
+    "vsi": (-0.152, 0.23, 0.04),
+    "tach": (-0.388, 0.115, 0.04),
+    "vor1": (-0.035, 0.345, 0.036),
+    "vor2": (-0.035, 0.23, 0.036),
+    "clock": (-0.462, 0.345, 0.025),
+    "suction": (-0.462, 0.23, 0.021),
+    "ammeter": (-0.462, 0.15, 0.021),
 }
-RECT_GAUGES = {"engine": (-0.215, 0.085, 0.046), "fuel": (0.355, 0.315, 0.046)}
+RECT_GAUGES = {"engine": (-0.215, 0.115, 0.046), "fuel": (0.355, 0.345, 0.046)}
 
 
 def build_panel():
@@ -482,7 +483,7 @@ def build_panel():
     for name, (x, y, half) in RECT_GAUGES.items():
         h = half + 0.002
         add_poly([(x - h, y - h), (x + h, y - h), (x + h, y + h), (x - h, y + h)])
-    add_poly([(0.037, 0.052), (0.223, 0.052), (0.223, 0.398), (0.037, 0.398)])  # radio stack bay
+    add_poly([(0.037, 0.082), (0.223, 0.082), (0.223, 0.428), (0.037, 0.428)])  # radio stack bay
     curve.materials.append(M["panel"])
     panel = bpy.data.objects.new("panel", curve)
     export_col.objects.link(panel)
@@ -511,7 +512,7 @@ def build_instrument_backs():
         part.loft([ring_in, ring_back], M["dial"], caps=False)
     for name, (x, y, half) in RECT_GAUGES.items():
         part.box((x, y, PANEL_Z - 0.012), (half * 2 + 0.01, half * 2 + 0.01, 0.006), M["dial"])
-    part.box((0.13, 0.225, PANEL_Z - 0.03), (0.19, 0.35, 0.02), M["radio_face"])
+    part.box((0.13, 0.255, PANEL_Z - 0.03), (0.19, 0.35, 0.02), M["radio_face"])
     return part.finish(recalc=False, modifiers=[bevel(0.0015, 1, 60)])
 
 
@@ -540,14 +541,14 @@ def build_gauge_faces():
     # Radio stack and annunciator faces.
     radios = Part("radios")
     z = PANEL_Z - 0.0195
-    radios.poly([P(0.04, 0.055, z), P(0.22, 0.055, z), P(0.22, 0.395, z), P(0.04, 0.395, z)], M["radio_face"])
+    radios.poly([P(0.04, 0.085, z), P(0.22, 0.085, z), P(0.22, 0.425, z), P(0.04, 0.425, z)], M["radio_face"])
     obj = radios.finish(recalc=False)
-    set_uv_planar(obj, 0.13, 0.225, 0.09, 0.17)
+    set_uv_planar(obj, 0.13, 0.255, 0.09, 0.17)
     ann = Part("annunciator")
     z = PANEL_Z + 0.004
-    ann.poly([P(-0.43, 0.383, z), P(-0.11, 0.383, z), P(-0.11, 0.405, z), P(-0.43, 0.405, z)], M["screen"])
+    ann.poly([P(-0.43, 0.413, z), P(-0.11, 0.413, z), P(-0.11, 0.435, z), P(-0.43, 0.435, z)], M["screen"])
     obj = ann.finish(recalc=False)
-    set_uv_planar(obj, -0.27, 0.394, 0.16, 0.011)
+    set_uv_planar(obj, -0.27, 0.424, 0.16, 0.011)
 
 
 def build_panel_fittings():
@@ -571,10 +572,13 @@ def build_panel_fittings():
     part.box((0.38, 0.06, front), (0.24, 0.11, 0.006), M["panel_edge"])
     part.box((0.38, 0.1, front + 0.006), (0.05, 0.012, 0.006), M["chrome"])
     # Hobbs meter, ELT switch, and the operating-limitations placard.
-    part.box((0.45, 0.315, front), (0.05, 0.022, 0.006), M["screen"])
-    part.box((0.45, 0.25, front + 0.002), (0.03, 0.03, 0.01), M["switch_red"])
-    part.box((0.43, 0.19, front - 0.002), (0.12, 0.03, 0.002), M["placard"])
-    part.box((0.355, 0.245, front - 0.002), (0.1, 0.014, 0.002), M["placard"])
+    part.box((0.45, 0.345, front), (0.05, 0.022, 0.006), M["screen"])
+    part.box((0.45, 0.28, front + 0.002), (0.03, 0.03, 0.01), M["switch_red"])
+    part.box((0.43, 0.22, front - 0.002), (0.12, 0.03, 0.002), M["placard"])
+    part.box((0.355, 0.275, front - 0.002), (0.1, 0.014, 0.002), M["placard"])
+    # Yoke collars: fixed to the panel; the shafts slide through them.
+    for x in (-0.27, 0.27):
+        part.cylinder((x, YOKE_Y, front - 0.012), (x, YOKE_Y, front + 0.022), 0.028, M["bezel"], sides=20)
     # Throttle and mixture legend, flap gate with detents.
     part.box((0.027, -0.012, front - 0.002), (0.09, 0.01, 0.002), M["placard"])
     part.box((0.255, 0.02, front - 0.002), (0.01, 0.08, 0.004), M["dial"])
@@ -586,7 +590,7 @@ def build_panel_fittings():
 def build_glareshield():
     """A padded arc over the panel, running forward to the windshield."""
     part = Part("glareshield")
-    top = 0.43
+    top = panel_top(0.0)
     profile = [
         (top - 0.012, PANEL_Z + 0.004),
         (top + 0.01, PANEL_Z + 0.026),
@@ -609,7 +613,7 @@ def build_glareshield():
 
 def build_compass():
     part = Part("compass")
-    top = 0.43
+    top = panel_top(0.0)
     base = (0.1, top + 0.045, PANEL_Z - 0.12)
     part.box((base[0], base[1] + 0.03, base[2]), (0.07, 0.055, 0.06), M["bezel"])
     part.box((base[0], base[1], base[2]), (0.045, 0.02, 0.05), M["bezel"])
@@ -648,10 +652,10 @@ def build_flap_lever():
 def build_yoke(name, x):
     """Column plus the ram's-horn wheel, pivoting at the panel."""
     part = Part(name)
-    cy, z_wheel = 0.13, PANEL_Z + 0.26
-    # Collar on the panel and the chrome shaft.
-    part.cylinder((x, cy, PANEL_Z - 0.01), (x, cy, PANEL_Z + 0.02), 0.028, M["bezel"], sides=20)
-    part.cylinder((x, cy, PANEL_Z), (x, cy, z_wheel - 0.02), 0.011, M["chrome"], sides=14)
+    cy, z_wheel = YOKE_Y, PANEL_Z + 0.26
+    # The chrome shaft runs well into the panel, so it slides out of the
+    # fixed collar (in panel_fittings) when you pull back, like the real one.
+    part.cylinder((x, cy, PANEL_Z - 0.2), (x, cy, z_wheel - 0.02), 0.011, M["chrome"], sides=14)
     # Hub with the pale centre plate.
     part.cylinder((x, cy, z_wheel - 0.03), (x, cy + 0.004, z_wheel + 0.016), 0.034, M["yoke"], sides=20, radius_b=0.03)
     part.cylinder((x, cy + 0.004, z_wheel + 0.016), (x, cy + 0.004, z_wheel + 0.019), 0.024, M["yoke_plate"], sides=20)
