@@ -1,6 +1,7 @@
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Plane } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { getCategory } from "../../content/categories";
+import { flightUrl, isFlyable } from "../../content/flight";
 import { places } from "../../content/places";
 import type { Highlight, Place, PlaceSection } from "../../content/types";
 import { placesOnSameTrip } from "../../lib/trips";
@@ -64,7 +65,7 @@ export function PlaceView({ place, backLabel, hoveredPlaceId, onBack, onSelectPl
         </ul>
       </header>
 
-      {place.links.length > 0 && (
+      {(place.links.length > 0 || isFlyable(place)) && (
         <div className="place-actions">
           {place.links.map((link, index) => (
             <a
@@ -78,6 +79,15 @@ export function PlaceView({ place, backLabel, hoveredPlaceId, onBack, onSelectPl
               {link.label}
             </a>
           ))}
+          {isFlyable(place) && (
+            <a
+              className={place.links.length === 0 ? "action-button action-button--primary" : "action-button"}
+              href={flightUrl(place)}
+            >
+              <Plane size={16} aria-hidden="true" />
+              Fly here
+            </a>
+          )}
         </div>
       )}
 

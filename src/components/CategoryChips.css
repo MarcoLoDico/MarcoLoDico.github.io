@@ -76,3 +76,10 @@
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
 }
+
+/* Leaves the map for the flight simulator page rather than filtering it. */
+.category-chip--link {
+  --category-color: #0891b2;
+  color: inherit;
+  text-decoration: none;
+}

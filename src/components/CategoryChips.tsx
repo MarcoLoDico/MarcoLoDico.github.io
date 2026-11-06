@@ -1,3 +1,4 @@
+import { Plane } from "lucide-react";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { categories } from "../content/categories";
 import { places } from "../content/places";
@@ -51,6 +52,10 @@ export function CategoryChips({ activeCategoryId, onShowCategory }: CategoryChip
           </button>
         );
       })}
+      <a className="category-chip category-chip--link" href={`${import.meta.env.BASE_URL}flight/`}>
+        <Plane size={16} strokeWidth={2.25} aria-hidden="true" />
+        <span>Flight sim</span>
+      </a>
     </nav>
   );
 }
