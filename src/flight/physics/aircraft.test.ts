@@ -75,7 +75,7 @@ describe("Cessna 172 flight model", () => {
       },
     };
     const aircraft = new Aircraft();
-    aircraft.position.set(0, 1.16, 0);
+    aircraft.position.set(0, 1.21, 0);
     const controls = neutralControls();
     for (let t = 0; t < 3; t += DT) {
       aircraft.step(controls, flat, DT);

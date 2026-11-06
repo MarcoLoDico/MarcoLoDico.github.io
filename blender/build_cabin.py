@@ -246,26 +246,25 @@ def set_uv_planar(obj, cx, cy, half_w, half_h):
 
 STATIONS = [
     # z, top, bottom, widthTop, widthBottom, radiusTop, radiusBottom
-    (-2.14, 0.3, -0.27, 0.27, 0.29, 0.22, 0.2),
-    (-2.06, 0.37, -0.36, 0.38, 0.39, 0.22, 0.2),
-    (-1.86, 0.43, -0.48, 0.47, 0.48, 0.2, 0.18),
-    (-1.55, 0.46, -0.58, 0.52, 0.53, 0.17, 0.16),
-    (-1.3, 0.48, -0.63, 0.54, 0.55, 0.15, 0.15),
-    (-0.88, 0.8, -0.67, 0.52, 0.56, 0.16, 0.13),
-    (-0.47, 1.03, -0.69, 0.5, 0.56, 0.15, 0.12),
-    (-0.43, 1.035, -0.69, 0.5, 0.56, 0.15, 0.12),
-    (0.33, 1.05, -0.69, 0.5, 0.56, 0.15, 0.12),
-    (0.5, 1.05, -0.68, 0.5, 0.56, 0.15, 0.12),
-    (1.07, 1.04, -0.63, 0.48, 0.54, 0.15, 0.12),
-    (2.15, 0.67, -0.44, 0.4, 0.43, 0.14, 0.12),
+    (-2.14, 0.3, -0.24, 0.27, 0.28, 0.2, 0.18),
+    (-2.06, 0.37, -0.32, 0.38, 0.38, 0.21, 0.18),
+    (-1.86, 0.43, -0.42, 0.47, 0.47, 0.19, 0.16),
+    (-1.55, 0.46, -0.47, 0.52, 0.52, 0.16, 0.14),
+    (-1.3, 0.48, -0.5, 0.54, 0.54, 0.15, 0.13),
+    (-0.88, 0.8, -0.52, 0.52, 0.55, 0.16, 0.12),
+    (-0.47, 1.03, -0.53, 0.5, 0.55, 0.15, 0.11),
+    (-0.43, 1.035, -0.53, 0.5, 0.55, 0.15, 0.11),
+    (0.33, 1.05, -0.53, 0.5, 0.55, 0.15, 0.11),
+    (0.5, 1.05, -0.52, 0.5, 0.55, 0.15, 0.11),
+    (1.07, 1.04, -0.48, 0.47, 0.52, 0.15, 0.11),
+    (2.15, 0.66, -0.33, 0.36, 0.38, 0.13, 0.1),
 ]
 # The rest of the tailcone, for the preview renders' exterior skin only.
 TAIL_STATIONS = [
-    (3.35, 0.53, -0.25, 0.28, 0.29, 0.12, 0.11),
-    (4.55, 0.43, -0.09, 0.18, 0.18, 0.1, 0.09),
-    (5.62, 0.35, 0.05, 0.07, 0.07, 0.05, 0.05),
+    (3.35, 0.52, -0.17, 0.23, 0.24, 0.11, 0.09),
+    (4.55, 0.42, -0.04, 0.14, 0.14, 0.08, 0.07),
+    (5.62, 0.35, 0.07, 0.06, 0.06, 0.04, 0.04),
 ]
-
 SILL, STRIPE_TOP, STRIPE_BOTTOM, PINSTRIPE = 0.66, 0.44, 0.31, 0.285
 
 
@@ -309,6 +308,32 @@ def section_ring(s):
 
 
 HALF_SEGMENTS = 14
+# The windshield's lower side edge runs level at glareshield height; faces it
+# crosses are cut there (glass above, solid below). Matches cessna.ts.
+WINDSHIELD_SILL = 0.47
+
+
+def is_windshield_side(band, segment):
+    return band in (4, 5) and mirror(segment) in (4, 5)
+
+
+def clip_at_height(points, height, keep_above):
+    """Clips a convex polygon of (x, y, z) sim points against a level plane."""
+    out = []
+    inside = (lambda p: p[1] >= height) if keep_above else (lambda p: p[1] <= height)
+    for i, a in enumerate(points):
+        b = points[(i + 1) % len(points)]
+        if inside(a):
+            out.append(a)
+        if inside(a) != inside(b):
+            t = (height - a[1]) / (b[1] - a[1])
+            out.append((a[0] + (b[0] - a[0]) * t, height, a[2] + (b[2] - a[2]) * t))
+    return out
+
+
+def section_point(stations, station, i):
+    x, y = section_ring(stations[station])[i]
+    return (x, y, stations[station][0])
 
 
 def mirror(segment):
@@ -319,8 +344,8 @@ def is_window(band, segment):
     """Same window layout as the exterior skin."""
     k = mirror(segment)
     roof = k in (0, 1)
-    if band in (4, 5) and (roof or k in (2, 3, 4, 5)):
-        return True  # windshield, wrapping down to the cowl at the sides
+    if band in (4, 5) and (roof or k in (2, 3)):
+        return True  # windshield, over the top and round the corners
     if band in (7, 9) and k in (4, 5):
         return True  # door window, rear side window
     if band == 10 and (roof or k == 2):
@@ -348,15 +373,28 @@ def build_lining():
         return verts[key]
 
     n = len(rings[0])
+
+    def sim_point(station, i):
+        x, y = rings[station][i]
+        return (x * inset_x, y * inset_y + 0.008, STATIONS[station][0])
+
     for band in range(first_band, last_band):
         for i in range(n):
             if is_window(band, i):
                 continue
+            if is_windshield_side(band, i):
+                j = (i + 1) % n
+                quad = [sim_point(band, i), sim_point(band, j), sim_point(band + 1, j), sim_point(band + 1, i)]
+                below = clip_at_height(quad, WINDSHIELD_SILL, False)
+                if len(below) >= 3:
+                    face = part.bm.faces.new([part.bm.verts.new(P(*p)) for p in below])
+                    part._tag([face], M["glare"])
+                continue
             j = (i + 1) % n
             k = mirror(i)
             y = (rings[band][i][1] + rings[band][j][1] + rings[band + 1][i][1] + rings[band + 1][j][1]) / 4
-            if band <= 5 and y < 0.42:
-                mat = M["glare"]  # down beside the panel, behind the glareshield
+            if band == 4 or (band == 5 and y < 0.42):
+                mat = M["glare"]  # the dash cheeks, continuous with the glareshield
             elif band <= 6 or (band == 8 and y > 0.3):
                 mat = M["frame"]  # A- and B-pillars
             elif k in (0, 1) or y > 0.95:
@@ -390,6 +428,8 @@ def build_lining():
 
 PANEL_Z = -0.86
 PANEL_BOTTOM = -0.06
+# The cabin wall is about 0.52 m out at panel height, so the panel runs right to it.
+PANEL_HALF_WIDTH = 0.515
 FLOOR_Y = -0.3
 
 
@@ -433,8 +473,9 @@ def build_panel():
             point.co = (x, y, 0, 1)
         spline.use_cyclic_u = True
 
-    outline = [(-0.5 + c / 40, PANEL_BOTTOM) for c in range(41)]
-    outline += [(0.5 - c / 40, panel_top(0.5 - c / 40)) for c in range(41)]
+    edge = PANEL_HALF_WIDTH
+    outline = [(-edge + 2 * edge * c / 40, PANEL_BOTTOM) for c in range(41)]
+    outline += [(edge - 2 * edge * c / 40, panel_top(edge - 2 * edge * c / 40)) for c in range(41)]
     add_poly(outline)
     for name, (x, y, r) in GAUGES.items():
         add_poly([(x + math.cos(t) * (r + 0.002), y + math.sin(t) * (r + 0.002)) for t in (k / 40 * math.tau for k in range(40))])
@@ -449,11 +490,12 @@ def build_panel():
     panel.rotation_euler = (math.radians(90), 0, 0)
     panel.location = P(0, 0, PANEL_Z - 0.009)
 
-    # Wings at each end, angled back toward the doors.
-    part = Part("panel_wings")
+    # Trim strips where the panel meets the cabin walls, tucked into them so there's no gap.
+    part = Part("panel_trim")
     for side in (-1, 1):
-        part.poly([P(side * 0.5, PANEL_BOTTOM, PANEL_Z), P(side * 0.555, PANEL_BOTTOM, PANEL_Z + 0.1), P(side * 0.555, panel_top(0.555), PANEL_Z + 0.1), P(side * 0.5, panel_top(0.5), PANEL_Z)], M["panel_edge"])
-    part.finish(recalc=False, modifiers=[("SOLIDIFY", {"thickness": 0.012, "offset": 0.0})])
+        x = side * (edge + 0.02)
+        part.box((x, (PANEL_BOTTOM + panel_top(edge)) / 2, PANEL_Z - 0.005), (0.045, panel_top(edge) - PANEL_BOTTOM, 0.03), M["panel_edge"])
+    part.finish(recalc=True, modifiers=[bevel(0.004, 2, 40)])
     return panel
 
 
@@ -555,12 +597,11 @@ def build_glareshield():
         (top - 0.04, -1.29),
         (top - 0.04, PANEL_Z - 0.06),
     ]
-    xs = [-0.56 + i * 0.07 for i in range(17)]
+    xs = [-0.55 + i * 0.55 / 8 for i in range(17)]
     rings = []
     for x in xs:
-        drop = top - panel_top(min(abs(x), 0.55))
-        inset = 0.06 if abs(x) > 0.5 else 0.0
-        rings.append([P(x, y - drop, z + inset) for y, z in profile])
+        drop = top - panel_top(min(abs(x), PANEL_HALF_WIDTH))
+        rings.append([P(x, y - drop, z) for y, z in profile])
     # Loft across x: build as rings along the x axis.
     part.loft(rings, M["glare"], closed=True, caps=True)
     return part.finish(smooth_angle=50, modifiers=[subsurf(1)])
@@ -666,21 +707,22 @@ def build_pedals():
 
 def build_seats():
     part = Part("seats")
-    for x in (-0.27, 0.27):
-        # Cushion, backrest and headrest: rounded by the subdivision below.
-        part.box((x, FLOOR_Y + 0.25, 0.0), (0.44, 0.1, 0.48), M["leather"])
-        part.box((x, FLOOR_Y + 0.66, 0.31), (0.44, 0.7, 0.11), M["leather"], rotation=Matrix.Rotation(math.radians(8), 4, "X"))
+    for x in (-0.26, 0.26):
+        # Cushion, backrest and headrest: rounded by the bevel below. Sized to
+        # clear the cabin walls, which taper in toward the roof.
+        part.box((x, FLOOR_Y + 0.25, 0.0), (0.4, 0.1, 0.48), M["leather"])
+        part.box((x, FLOOR_Y + 0.66, 0.31), (0.4, 0.7, 0.11), M["leather"], rotation=Matrix.Rotation(math.radians(8), 4, "X"))
         part.box((x, FLOOR_Y + 1.08, 0.36), (0.25, 0.15, 0.09), M["leather"])
         # Seat frame and rails.
         for dx in (-0.15, 0.15):
             part.box((x + dx, FLOOR_Y + 0.1, 0.0), (0.03, 0.2, 0.4), M["steel"])
             part.box((x + dx, FLOOR_Y + 0.012, -0.05), (0.02, 0.02, 0.8), M["chrome"])
-    part.box((0, FLOOR_Y + 0.22, 1.02), (1.0, 0.12, 0.46), M["leather"])
-    part.box((0, FLOOR_Y + 0.6, 1.27), (1.0, 0.64, 0.1), M["leather"])
+    part.box((0, FLOOR_Y + 0.22, 1.02), (0.84, 0.12, 0.46), M["leather"])
+    part.box((0, FLOOR_Y + 0.6, 1.27), (0.8, 0.64, 0.1), M["leather"])
     seats = part.finish(recalc=True, smooth_angle=60, modifiers=[bevel(0.03, 3, 30)])
 
     details = Part("seat_details")
-    for x in (-0.27, 0.27):
+    for x in (-0.26, 0.26):
         details.box((x, FLOOR_Y + 0.302, 0.0), (0.34, 0.006, 0.38), M["leather_dark"])
         details.box((x, FLOOR_Y + 0.66, 0.252), (0.32, 0.56, 0.006), M["leather_dark"], rotation=Matrix.Rotation(math.radians(8), 4, "X"))
         # Lap belt across the seat, shoulder harness down the back.
@@ -692,14 +734,14 @@ def build_seats():
 
 def build_floor_and_doors():
     part = Part("floor_doors")
-    part.box((0, FLOOR_Y - 0.015, -0.15), (1.06, 0.03, 2.4), M["carpet"])
+    part.box((0, FLOOR_Y - 0.015, -0.15), (1.0, 0.03, 2.4), M["carpet"])
     # Firewall kick panel under the panel.
     part.box((0, -0.25, -0.9), (1.04, 0.12, 0.04), M["carpet"], rotation=Matrix.Rotation(math.radians(30), 4, "X"))
     for side in (-1, 1):
-        x = side * 0.5
+        x = side * 0.48
         part.box((x, 0.13, -0.02), (0.06, 0.05, 0.46), M["trim"])  # armrest
         part.box((side * 0.505, 0.3, -0.28), (0.03, 0.025, 0.12), M["chrome"])  # handle
-        part.box((side * 0.52, -0.08, -0.1), (0.02, 0.16, 0.4), M["wall_low"])  # map pocket
+        part.box((side * 0.49, -0.08, -0.1), (0.02, 0.16, 0.4), M["wall_low"])  # map pocket
     # Overhead: dome light, speaker grille, and the fresh-air vents in the wing roots.
     part.box((0, 1.0, 0.25), (0.12, 0.02, 0.07), M["placard"])
     part.box((0, 1.005, -0.25), (0.16, 0.012, 0.12), M["panel_edge"])
@@ -798,7 +840,7 @@ def render_previews(directory):
     sun.rotation_euler = (math.radians(40), math.radians(15), math.radians(-30))
     helper_col.objects.link(sun)
     ground = Part("ground")
-    ground.poly([P(-200, -1.15, -200), P(200, -1.15, -200), P(200, -1.15, 200), P(-200, -1.15, 200)], material("ground", 0x7f9a62))
+    ground.poly([P(-200, -1.23, -200), P(200, -1.23, -200), P(200, -1.23, 200), P(-200, -1.23, 200)], material("ground", 0x7f9a62))
     ground.finish(collection=helper_col, recalc=False)
 
     # The exterior skin (windows left open) so the previews show the cockpit in context.
@@ -813,6 +855,12 @@ def render_previews(directory):
             if is_window(band, i):
                 continue
             j = (i + 1) % n
+            if is_windshield_side(band, i):
+                quad = [section_point(stations, band, i), section_point(stations, band, j), section_point(stations, band + 1, j), section_point(stations, band + 1, i)]
+                below = clip_at_height(quad, WINDSHIELD_SILL, False)
+                if len(below) >= 3:
+                    skin._tag([skin.bm.faces.new([skin.bm.verts.new(P(*p)) for p in below])], paint)
+                continue
             f = skin.bm.faces.new([verts[band][i], verts[band][j], verts[band + 1][j], verts[band + 1][i]])
             skin._tag([f], paint)
     skin.finish(collection=helper_col, smooth_angle=40)
@@ -840,6 +888,9 @@ def render_previews(directory):
     shoot("left", eye, 70, -5)
     shoot("right", eye, -55, -8)
     shoot("cabin-wide", (0.3, 0.95, 0.9), 12, -18, fov=80)
+    # From outside, to catch anything poking through the fuselage skin.
+    shoot("outside-left", (-3.2, 0.35, 0.2), -90, -2, fov=50)
+    shoot("outside-right", (3.2, 0.35, 0.2), 90, -2, fov=50)
 
 
 if RENDER_DIR:

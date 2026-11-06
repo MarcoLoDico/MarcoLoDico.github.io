@@ -23,7 +23,7 @@ import { MeshBuilder, type V3 } from "./meshBuilder";
  * curved, crisp where it has edges.
  *
  * Body axes: +x right, +y up, -z forward; origin at the centre of gravity,
- * with the tyres touching the ground at y = -1.15.
+ * with the tyres touching the ground at y = -1.23.
  */
 
 const WHITE = 0xf4f3ef;
@@ -67,21 +67,21 @@ const st = (z: number, top: number, bottom: number, widthTop: number, widthBotto
 });
 
 const STATIONS: readonly Station[] = [
-  st(-2.14, 0.3, -0.27, 0.27, 0.29, 0.22, 0.2), // 0 cowl lip
-  st(-2.06, 0.37, -0.36, 0.38, 0.39, 0.22, 0.2), // 1
-  st(-1.86, 0.43, -0.48, 0.47, 0.48, 0.2, 0.18), // 2
-  st(-1.55, 0.46, -0.58, 0.52, 0.53, 0.17, 0.16), // 3
-  st(-1.3, 0.48, -0.63, 0.54, 0.55, 0.15, 0.15), // 4 firewall, windshield base
-  st(-0.88, 0.8, -0.67, 0.52, 0.56, 0.16, 0.13), // 5 mid windshield
-  st(-0.47, 1.03, -0.69, 0.5, 0.56, 0.15, 0.12), // 6 windshield top, A-pillar front
-  st(-0.43, 1.035, -0.69, 0.5, 0.56, 0.15, 0.12), // 7 A-pillar rear, door window front
-  st(0.33, 1.05, -0.69, 0.5, 0.56, 0.15, 0.12), // 8 B-pillar front
-  st(0.5, 1.05, -0.68, 0.5, 0.56, 0.15, 0.12), // 9 B-pillar rear
-  st(1.07, 1.04, -0.63, 0.48, 0.54, 0.15, 0.12), // 10 roof end
-  st(2.15, 0.67, -0.44, 0.4, 0.43, 0.14, 0.12), // 11 rear window bottom
-  st(3.35, 0.53, -0.25, 0.28, 0.29, 0.12, 0.11), // 12
-  st(4.55, 0.43, -0.09, 0.18, 0.18, 0.1, 0.09), // 13
-  st(5.62, 0.35, 0.05, 0.07, 0.07, 0.05, 0.05), // 14 tail
+  st(-2.14, 0.3, -0.24, 0.27, 0.28, 0.2, 0.18), // 0 cowl lip
+  st(-2.06, 0.37, -0.32, 0.38, 0.38, 0.21, 0.18), // 1
+  st(-1.86, 0.43, -0.42, 0.47, 0.47, 0.19, 0.16), // 2
+  st(-1.55, 0.46, -0.47, 0.52, 0.52, 0.16, 0.14), // 3
+  st(-1.3, 0.48, -0.5, 0.54, 0.54, 0.15, 0.13), // 4 firewall, windshield base
+  st(-0.88, 0.8, -0.52, 0.52, 0.55, 0.16, 0.12), // 5 mid windshield
+  st(-0.47, 1.03, -0.53, 0.5, 0.55, 0.15, 0.11), // 6 windshield top, A-pillar front
+  st(-0.43, 1.035, -0.53, 0.5, 0.55, 0.15, 0.11), // 7 A-pillar rear, door window front
+  st(0.33, 1.05, -0.53, 0.5, 0.55, 0.15, 0.11), // 8 B-pillar front
+  st(0.5, 1.05, -0.52, 0.5, 0.55, 0.15, 0.11), // 9 B-pillar rear
+  st(1.07, 1.04, -0.48, 0.47, 0.52, 0.15, 0.11), // 10 roof end
+  st(2.15, 0.66, -0.33, 0.36, 0.38, 0.13, 0.1), // 11 rear window bottom
+  st(3.35, 0.52, -0.17, 0.23, 0.24, 0.11, 0.09), // 12
+  st(4.55, 0.42, -0.04, 0.14, 0.14, 0.08, 0.07), // 13
+  st(5.62, 0.35, 0.07, 0.06, 0.06, 0.04, 0.04), // 14 tail
 ];
 
 // Fractions of the straight side (from the lower corner up) where paint lines and windows run.
@@ -122,6 +122,40 @@ function halfSection(s: Station): [number, number][] {
   ];
 }
 
+/**
+ * The windshield's lower side edge runs level at glareshield height, not
+ * along the section lines, so the faces it crosses are split at this height:
+ * glass above, painted skin below. The cabin model in Blender does the same.
+ */
+export const WINDSHIELD_SILL = 0.47;
+
+/** True for the faces that the windshield's level lower edge cuts through. */
+function isWindshieldSide(band: number, segment: number): boolean {
+  const k = mirrorSegment(segment);
+  return (band === 4 || band === 5) && (k === 4 || k === SEG.window);
+}
+
+/** Clips a convex polygon against a horizontal plane, keeping one side. */
+function clipAtHeight(points: readonly V3[], height: number, keepAbove: boolean): V3[] {
+  const out: V3[] = [];
+  const inside = (p: V3) => (keepAbove ? p[1] >= height : p[1] <= height);
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    if (!a || !b) {
+      continue;
+    }
+    if (inside(a)) {
+      out.push(a);
+    }
+    if (inside(a) !== inside(b)) {
+      const t = (height - a[1]) / (b[1] - a[1]);
+      out.push([a[0] + (b[0] - a[0]) * t, height, a[2] + (b[2] - a[2]) * t]);
+    }
+  }
+  return out;
+}
+
 /** Top and bottom of the fuselage centreline at a station, for seating parts on the skin. */
 function fuselageAt(z: number): { top: number; bottom: number } {
   for (let i = 0; i + 1 < STATIONS.length; i++) {
@@ -157,9 +191,10 @@ function fuselagePaint(band: number, segment: number): number {
   const k = mirrorSegment(segment);
   const roof = (SEG.roof as readonly number[]).includes(k);
   const window = k === SEG.window;
-  // Windshield over the top, wrapping down to the cowl at the sides, then
-  // the slim A-pillar (band 6) before the door window.
-  if ((band === 4 || band === 5) && (roof || k === 2 || k === 3 || k === 4 || window)) {
+  // Windshield over the top and round the corners (its lower sides are cut
+  // level with the glareshield, see WINDSHIELD_SILL), then the slim A-pillar
+  // (band 6) before the door window.
+  if ((band === 4 || band === 5) && (roof || k === 2 || k === 3)) {
     return GLASS;
   }
   // Door window, then the B-pillar (band 8), then the rear side window.
@@ -360,7 +395,13 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
       const color = fuselagePaint(band, i);
       const [a0, a1, b0, b1] = [a[i], a[j], b[i], b[j]];
       if (a0 && a1 && b0 && b1) {
-        (color === GLASS ? glazing : skin).quad(a0, a1, b1, b0, color, inside);
+        if (isWindshieldSide(band, i)) {
+          const quad = [a0, a1, b1, b0];
+          fan(glazing, clipAtHeight(quad, WINDSHIELD_SILL, true), GLASS, inside);
+          fan(skin, clipAtHeight(quad, WINDSHIELD_SILL, false), color, inside);
+        } else {
+          (color === GLASS ? glazing : skin).quad(a0, a1, b1, b0, color, inside);
+        }
       }
     }
   }
@@ -398,7 +439,7 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
     wing.loft([tipFull, tipCap], () => NAVY);
     // Lift strut: an elliptical section from the lower fuselage to the wing.
     const strutTop = wingPoint(side * 2.55, 0.28);
-    wing.beam([side * 0.5, -0.44, -0.08], [strutTop[0], strutTop[1] - 0.06, strutTop[2]], 0.05, 6, WHITE, 0.04);
+    wing.beam([side * 0.5, -0.38, 0.0], [strutTop[0], strutTop[1] - 0.06, strutTop[2]], 0.05, 6, WHITE, 0.04);
     // Landing light in the left leading edge, pitot tube under the left wing.
     if (side < 0) {
       const lightAt = wingPoint(-2.0, 0.02);
@@ -446,7 +487,8 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
 
   // ---- Fin and rudder ----
   const FIN_ROOT = 0.36;
-  const FIN_TIP = 1.58;
+  // Overall height (ground to beacon) is the C172S's 2.72 m.
+  const FIN_TIP = 1.44;
   const FIN_HINGE = 0.64;
   const finAt = (y: number) => {
     const t = (y - FIN_ROOT) / (FIN_TIP - FIN_ROOT);
@@ -483,17 +525,17 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
   const gear = new MeshBuilder();
   const gearSatin = new MeshBuilder();
   for (const side of [-1, 1]) {
-    springLeg(gearSatin, [side * 0.46, -0.6, 0.3], [side * 1.14, -0.84, 0.28]);
-    wheel(gear, gearSatin, [side * 1.25, -0.85, 0.28], 0.3, 0.15);
-    wheelPant(gear, [side * 1.25, -0.85, 0.28], 0.3, 0.14, 1.12);
+    springLeg(gearSatin, [side * 0.44, -0.47, 0.25], [side * 1.15, -0.92, 0.25]);
+    wheel(gear, gearSatin, [side * 1.27, -0.93, 0.25], 0.3, 0.15);
+    wheelPant(gear, [side * 1.27, -0.93, 0.25], 0.3, 0.14, 1.12);
   }
   // Nose gear: oleo strut with a chrome piston, fork, and a smaller fairing.
-  gearSatin.beam([0, -0.5, -1.56], [0, -0.66, -1.66], 0.06, 8, STEEL);
-  gearSatin.beam([0, -0.66, -1.66], [0, -0.82, -1.72], 0.04, 8, CHROME);
-  gearSatin.beam([-0.09, -0.66, -1.69], [-0.09, -0.87, -1.72], 0.018, 4, STEEL);
-  gearSatin.beam([0.09, -0.66, -1.69], [0.09, -0.87, -1.72], 0.018, 4, STEEL);
-  wheel(gear, gearSatin, [0, -0.87, -1.72], 0.25, 0.13);
-  wheelPant(gear, [0, -0.87, -1.72], 0.25, 0.12, 0.86);
+  gearSatin.beam([0, -0.4, -1.34], [0, -0.62, -1.4], 0.06, 8, STEEL);
+  gearSatin.beam([0, -0.62, -1.4], [0, -0.86, -1.42], 0.04, 8, CHROME);
+  gearSatin.beam([-0.09, -0.66, -1.4], [-0.09, -0.95, -1.42], 0.018, 4, STEEL);
+  gearSatin.beam([0.09, -0.66, -1.4], [0.09, -0.95, -1.42], 0.018, 4, STEEL);
+  wheel(gear, gearSatin, [0, -0.95, -1.42], 0.25, 0.13);
+  wheelPant(gear, [0, -0.95, -1.42], 0.25, 0.12, 0.86);
   add(gear.build(CREASE), paint);
   add(gearSatin.build(CREASE), satin);
 
@@ -626,6 +668,18 @@ function springLeg(builder: MeshBuilder, from: V3, to: V3): void {
 }
 
 /** A tyre (a low-poly torus) with a hub, spinning about the x axis. */
+/** Triangulates a convex polygon as a fan. */
+function fan(builder: MeshBuilder, points: readonly V3[], color: number, inside: V3): void {
+  const first = points[0];
+  for (let k = 1; first && k + 1 < points.length; k++) {
+    const b = points[k];
+    const c = points[k + 1];
+    if (b && c) {
+      builder.tri(first, b, c, color, inside);
+    }
+  }
+}
+
 function wheel(paint: MeshBuilder, metal: MeshBuilder, center: V3, radius: number, width: number): void {
   const segments = 16;
   const tube = width / 2;

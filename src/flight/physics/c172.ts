@@ -54,16 +54,22 @@ export const C172 = {
     maxRpm: 2_700,
   },
 
-  /** Gear contact points in body coordinates (x right, y up, z aft), metres from the centre of gravity. */
+  /**
+   * Gear contact points in body coordinates (x right, y up, z aft), metres
+   * from the centre of gravity. They sit a few centimetres above the drawn
+   * tyre bottoms (y -1.23 mains, -1.2 nose) so that at rest, with the springs
+   * sagged, the tyres touch the ground instead of sinking into it.
+   */
   gear: {
-    mainLeft: [-1.25, -1.15, 0.25] as const,
-    mainRight: [1.25, -1.15, 0.25] as const,
-    nose: [0, -1.12, -1.72] as const,
-    mainStiffness: 52_000,
-    mainDamping: 5_200,
-    noseStiffness: 34_000,
-    noseDamping: 3_400,
-    maxCompression: 0.4,
+    mainLeft: [-1.27, -1.2, 0.25] as const,
+    mainRight: [1.27, -1.2, 0.25] as const,
+    nose: [0, -1.18, -1.42] as const,
+    // Stiff like the real spring-steel legs: about 3 cm of sag at rest.
+    mainStiffness: 150_000,
+    mainDamping: 9_000,
+    noseStiffness: 100_000,
+    noseDamping: 6_000,
+    maxCompression: 0.25,
     rollingFriction: 0.025,
     brakeFriction: 0.65,
     lateralFriction: 0.85,
@@ -74,9 +80,9 @@ export const C172 = {
   hardPoints: {
     leftWingtip: [-5.45, 1.2, 0.4] as const,
     rightWingtip: [5.45, 1.2, 0.4] as const,
-    propTip: [0, -0.92, -2.42] as const,
-    tail: [0, -0.08, 5.5] as const,
-    belly: [0, -0.72, 0.6] as const,
-    nose: [0, -0.36, -2.15] as const,
+    propTip: [0, -0.935, -2.42] as const,
+    tail: [0, 0.05, 5.5] as const,
+    belly: [0, -0.52, 0.6] as const,
+    nose: [0, -0.3, -2.15] as const,
   },
 } as const;

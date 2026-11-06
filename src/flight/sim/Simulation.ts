@@ -406,8 +406,8 @@ export class Simulation {
       return;
     }
     if (ground && ground.zoom >= 14) {
-      // Settle on the gear: CG 1.15 m above the tyres' contact points.
-      a.position.y = ground.height + 1.16;
+      // Settle on the gear: the contact points are 1.2 m below the CG.
+      a.position.y = ground.height + 1.21;
       a.velocity.set(0, 0, 0);
       this.status = "paused";
     }

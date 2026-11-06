@@ -344,7 +344,8 @@ export class Aircraft {
       const vRoll = vTangent.dot(rollDir);
       const vSide = vTangent.dot(sideDir);
       const rollingFriction = gear.rollingFriction + (isNose ? 0 : controls.brake * gear.brakeFriction);
-      const longitudinal = -clamp(vRoll / 0.4, -1, 1) * rollingFriction * normalForce;
+      // Rolling resistance reaches full strength by 5 cm/s, so idle thrust alone won't creep.
+      const longitudinal = -clamp(vRoll / 0.05, -1, 1) * rollingFriction * normalForce;
       const lateral = -clamp(vSide / 0.25, -1, 1) * gear.lateralFriction * normalForce;
 
       const f = vTangent.copy(n).multiplyScalar(normalForce).addScaledVector(rollDir, longitudinal).addScaledVector(sideDir, lateral);
