@@ -80,6 +80,56 @@ function depthNudged<T extends MeshLambertMaterial>(material: T, factor: number)
 }
 
 /**
+ * Draws windows on building walls from their facade coordinates (metres
+ * along and up each wall): a grid of panes per floor and bay, varied per
+ * window, with a storefront band on commercial blocks. The pattern fades to
+ * its average tone in the distance so it never shimmers.
+ */
+function withWindows<T extends MeshLambertMaterial>(material: T): T {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute vec2 facade;\nvarying vec2 vFacade;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvFacade = facade;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFacade;")
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        if (vFacade.y > 0.0) {
+          float style = floor(vFacade.x / 10000.0);
+          float along = vFacade.x - style * 10000.0;
+          bool tower = style > 0.5 && style < 1.5;
+          bool shops = style > 1.5;
+          float floorHeight = tower ? 3.8 : 3.1;
+          float bayWidth = tower ? 1.6 : 2.8;
+          vec2 grid = vec2(along / bayWidth, vFacade.y / floorHeight);
+          vec2 cell = floor(grid);
+          vec2 f = fract(grid);
+          float pane = tower
+            ? step(0.06, f.x) * step(f.x, 0.94) * step(0.12, f.y) * step(f.y, 0.94)
+            : step(0.22, f.x) * step(f.x, 0.78) * step(0.3, f.y) * step(f.y, 0.82);
+          float coverage = tower ? 0.72 : 0.31;
+          float noise = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+          vec3 glass = mix(vec3(0.07, 0.1, 0.14), vec3(0.2, 0.26, 0.33), noise);
+          if (shops && vFacade.y < floorHeight * 1.1) {
+            // Storefront: big panes at street level under a dark fascia.
+            pane = step(0.04, f.x) * step(f.x, 0.96) * step(0.04, vFacade.y / floorHeight) * step(vFacade.y / floorHeight, 0.8);
+            coverage = 0.74;
+            glass = vec3(0.05, 0.07, 0.09);
+          }
+          // Fade the grid out where it gets smaller than a few pixels.
+          vec2 footprint = fwidth(grid);
+          float detail = clamp(1.5 - max(footprint.x, footprint.y) * 2.5, 0.0, 1.0);
+          float amount = mix(coverage, pane, detail) * (tower ? 0.85 : 0.75);
+          diffuseColor.rgb = mix(diffuseColor.rgb, glass, amount);
+        }`,
+      );
+  };
+  material.customProgramCacheKey = () => "building-windows";
+  return material;
+}
+
+/**
  * Streams terrain tiles around the camera as a quadtree: big coarse tiles on
  * the horizon, 1.8 km tiles with buildings and trees underneath. Tiles are
  * built in a worker and kept in an LRU cache, and the flight model queries
@@ -93,8 +143,10 @@ export class Terrain {
   private readonly material = new MeshLambertMaterial({ vertexColors: true });
   // Paving and markings sit flush on the ground and win the depth test by a
   // relative nudge, so they never flicker at any distance.
-  private readonly pavingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.9995);
-  private readonly markingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.999);
+  private readonly pavingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.9996);
+  private readonly runwayMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.9993);
+  private readonly markingMaterial = depthNudged(new MeshLambertMaterial({ vertexColors: true }), 0.9989);
+  private readonly buildingMaterial = withWindows(new MeshLambertMaterial({ vertexColors: true }));
   private nextId = 1;
   private frameCounter = 0;
   private frame: LocalFrame;
@@ -120,6 +172,8 @@ export class Terrain {
     this.material.dispose();
     this.pavingMaterial.dispose();
     this.markingMaterial.dispose();
+    this.runwayMaterial.dispose();
+    this.buildingMaterial.dispose();
     this.entries.clear();
   }
 
@@ -380,12 +434,15 @@ export class Terrain {
     geometry.setAttribute("position", new BufferAttribute(built.positions, 3));
     geometry.setAttribute("normal", new BufferAttribute(built.normals, 3, true));
     geometry.setAttribute("color", new BufferAttribute(built.colors, 3, true));
+    geometry.setAttribute("facade", new BufferAttribute(built.facades, 2));
     geometry.computeBoundingSphere();
     const vertexCount = built.positions.length / 3;
-    geometry.addGroup(0, built.pavingStart, 0);
-    geometry.addGroup(built.pavingStart, built.markingStart - built.pavingStart, 1);
-    geometry.addGroup(built.markingStart, vertexCount - built.markingStart, 2);
-    const mesh = new Mesh(geometry, [this.material, this.pavingMaterial, this.markingMaterial]);
+    geometry.addGroup(0, built.buildingStart, 0);
+    geometry.addGroup(built.buildingStart, built.pavingStart - built.buildingStart, 1);
+    geometry.addGroup(built.pavingStart, built.runwayStart - built.pavingStart, 2);
+    geometry.addGroup(built.runwayStart, built.markingStart - built.runwayStart, 3);
+    geometry.addGroup(built.markingStart, vertexCount - built.markingStart, 4);
+    const mesh = new Mesh(geometry, [this.material, this.buildingMaterial, this.pavingMaterial, this.runwayMaterial, this.markingMaterial]);
     mesh.matrixAutoUpdate = false;
     mesh.receiveShadow = true;
     mesh.visible = false;

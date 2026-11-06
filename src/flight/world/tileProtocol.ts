@@ -48,8 +48,12 @@ export interface BuiltTile {
    * lon, radius, then vertexCount (east, north) footprint offsets in metres].
    */
   readonly obstacles: Float32Array;
-  /** Vertex index where paving starts, then where runway markings start (separate draw groups). */
+  /** Per-vertex facade coordinates (metres along and up each wall) for the window shader. */
+  readonly facades: Float32Array;
+  /** Vertex indices where buildings, paving, then runway markings start (separate draw groups). */
+  readonly buildingStart: number;
   readonly pavingStart: number;
+  readonly runwayStart: number;
   readonly markingStart: number;
 }
 

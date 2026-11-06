@@ -253,7 +253,8 @@ function extractFeatures(tile: VectorTile | null, z: number): TileFeatures | nul
     }
   }
   const buildings: TileFeatures["buildings"][number][] = [];
-  if (z >= 14) {
+  // Buildings come in from zoom 13, so they fill the view a few kilometres out.
+  if (z >= 13) {
     for (const feature of features(tile.layers["building"])) {
       extent = feature.extent;
       if (feature.type !== 3 || stringProp(feature, "hide_3d") === "true") {
@@ -298,6 +299,7 @@ async function build(id: number, z: number, x: number, y: number): Promise<void>
       geometry.positions.buffer,
       geometry.normals.buffer,
       geometry.colors.buffer,
+      geometry.facades.buffer,
       geometry.heights.buffer,
       geometry.water.buffer,
       geometry.obstacles.buffer,
