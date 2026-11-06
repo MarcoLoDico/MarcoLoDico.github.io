@@ -37,6 +37,7 @@ const CHROME = 0xd4d7da;
 const TIRE = 0x1c1d1f;
 const HUB = 0xb9bcc0;
 const BLADE = 0x2b2c2f;
+const SEAM = 0x8c8d91;
 
 const DEG = Math.PI / 180;
 const CREASE = 38;
@@ -167,6 +168,24 @@ function fuselageAt(z: number): { top: number; bottom: number } {
     }
   }
   return { top: 0, bottom: 0 };
+}
+
+/** The fuselage outline at any z, blended between the neighbouring stations. */
+function ringAt(z: number): [number, number][] {
+  for (let i = 0; i + 1 < STATIONS.length; i++) {
+    const a = STATIONS[i];
+    const b = STATIONS[i + 1];
+    if (a && b && z >= a.z && z <= b.z) {
+      const t = (z - a.z) / (b.z - a.z);
+      const ra = sectionRing(a);
+      const rb = sectionRing(b);
+      return ra.map(([x, y], k) => {
+        const q = rb[k] ?? [x, y, z];
+        return [x + (q[0] - x) * t, y + (q[1] - y) * t];
+      });
+    }
+  }
+  return [];
 }
 
 function sectionRing(s: Station): V3[] {
@@ -419,7 +438,31 @@ export function buildCessna(registration = "C-CMLD"): CessnaModel {
     });
     skin.cap(ring, COWL_DARK, [side * 0.205, 0, -2.0]);
   }
-  skin.beam([0.18, -0.5, -1.5], [0.2, -0.62, -1.42], 0.035, 6, 0x6b6a66);
+  skin.beam([0.18, -0.42, -1.5], [0.2, -0.54, -1.42], 0.035, 6, 0x6b6a66);
+
+  // Cowl details that make its outline read from the cockpit: the seam
+  // where the cowl meets the fuselage at the firewall, and the oil door.
+  const seam = (z: number, grow: number) =>
+    ringAt(z).map(([x, y]): V3 => {
+      const mid = fuselageAt(z);
+      const cy = (mid.top + mid.bottom) / 2;
+      return [x * grow, cy + (y - cy) * grow, z];
+    });
+  skin.loft([seam(-1.426, 1.006), seam(-1.414, 1.006)], () => SEAM, false);
+  const oilDoor: V3[] = [
+    [-0.085, fuselageAt(-1.96).top + 0.004, -1.96],
+    [0.085, fuselageAt(-1.96).top + 0.004, -1.96],
+    [0.085, fuselageAt(-1.74).top + 0.004, -1.74],
+    [-0.085, fuselageAt(-1.74).top + 0.004, -1.74],
+  ];
+  skin.cap(oilDoor, 0xd9d8d2, [0, 0, -1.85]);
+  for (let k = 0; k < 4; k++) {
+    const a = oilDoor[k];
+    const b = oilDoor[(k + 1) % 4];
+    if (a && b) {
+      skin.beam([a[0], a[1] + 0.001, a[2]], [b[0], b[1] + 0.001, b[2]], 0.004, 4, SEAM);
+    }
+  }
   add(skin.build(CREASE), paint);
   const windows = add(glazing.build(CREASE), glass, true, false);
   windows.renderOrder = 2;

@@ -355,6 +355,10 @@ export function buildTile(input: TileInputs): TileGeometry {
     const insideTile = (p: VectorPoint) => p.x >= 0 && p.y >= 0 && p.x <= extent && p.y <= extent;
 
     // ---- Runways and taxiways as ribbons on the levelled ground ----
+    // Paving sits a few centimetres above the ground the physics rolls on:
+    // just enough not to flicker into it up close, more on the coarse tiles
+    // seen only from far away.
+    const paveLift = 0.04 * 2 ** Math.max(0, 14 - z);
     const ribbon = (line: readonly VectorPoint[], width: number, color: number, lift: number) => {
       for (let s = 0; s + 1 < line.length; s++) {
         const a = line[s];
@@ -406,7 +410,7 @@ export function buildTile(input: TileInputs): TileGeometry {
           x: first.x + (dirX * d - dirY * (offset + (side * width) / 2)) / metersPerUnit,
           y: first.y + (dirY * d + dirX * (offset + (side * width) / 2)) / metersPerUnit,
         });
-        ribbon([p(from, 0), p(to, 0)], width, MARKING, 0.45);
+        ribbon([p(from, 0), p(to, 0)], width, MARKING, paveLift * 1.6);
       };
       // Centreline dashes.
       for (let d = 60; d + 30 < lengthMeters - 60; d += 60) {
@@ -429,10 +433,10 @@ export function buildTile(input: TileInputs): TileGeometry {
       }
     };
     for (const line of features.taxiways) {
-      ribbon(line, TAXIWAY_WIDTH, TAXIWAY, 0.2);
+      ribbon(line, TAXIWAY_WIDTH, TAXIWAY, paveLift * 0.8);
     }
     for (const line of features.runways) {
-      ribbon(line, RUNWAY_WIDTH, ASPHALT, 0.3);
+      ribbon(line, RUNWAY_WIDTH, ASPHALT, paveLift);
       markings(line);
     }
 

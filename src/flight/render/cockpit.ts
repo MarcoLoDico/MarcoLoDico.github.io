@@ -1,7 +1,9 @@
 import {
   CanvasTexture,
+  DoubleSide,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   SRGBColorSpace,
   Vector3,
   type BufferAttribute,
@@ -45,6 +47,10 @@ export interface Cockpit {
 }
 
 const CABIN_URL = `${import.meta.env.BASE_URL}models/c172-cabin.glb`;
+
+// The panel decal sheet spans the panel face (see build_cabin.py): x ±0.5 m,
+// y from -0.06 m to 0.46 m. Placards are placed in those panel coordinates.
+const DECAL = { left: -0.5, right: 0.5, bottom: -0.06, top: 0.46, pxPerMeter: 2048 };
 
 const CELL = 256;
 const ATLAS_COLUMNS = 4;
@@ -115,6 +121,15 @@ export async function loadCockpit(): Promise<Cockpit> {
   annunciator.width = 512;
   annunciator.height = 40;
   drawAnnunciator(annunciator);
+  const decals = document.createElement("canvas");
+  decals.width = Math.round((DECAL.right - DECAL.left) * DECAL.pxPerMeter);
+  decals.height = Math.round((DECAL.top - DECAL.bottom) * DECAL.pxPerMeter);
+  drawPlacards(decals);
+  const compass = document.createElement("canvas");
+  compass.width = 256;
+  compass.height = 112;
+  const compassCtx = compass.getContext("2d");
+  const compassTexture = canvasTexture(compass);
 
   const nodes = new Map<string, Object3D>();
   root.traverse((object) => {
@@ -125,7 +140,7 @@ export async function loadCockpit(): Promise<Cockpit> {
     const geometry = object.geometry as BufferGeometry;
     object.receiveShadow = true;
     object.castShadow = false;
-    if (object.name.startsWith("gauge_")) {
+    if (object.name.startsWith("gauge_") && object.name !== "gauge_glass") {
       const name = object.name.slice("gauge_".length);
       if (isGaugeName(name)) {
         const [column, row] = CELLS[name];
@@ -138,6 +153,27 @@ export async function loadCockpit(): Promise<Cockpit> {
     } else if (object.name === "annunciator") {
       remapUv(geometry);
       object.material = new MeshBasicMaterial({ map: canvasTexture(annunciator), toneMapped: false });
+    } else if (object.name === "panel_decals") {
+      // Lit like the panel, so the engraved-looking text shades with it.
+      remapUv(geometry);
+      object.material = new MeshStandardMaterial({ map: canvasTexture(decals), transparent: true, roughness: 0.75, depthWrite: false });
+      object.renderOrder = 1;
+    } else if (object.name === "gauge_glass") {
+      // Almost invisible, but it catches reflections like real instrument glass.
+      object.material = new MeshStandardMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.08,
+        roughness: 0.04,
+        metalness: 0.1,
+        envMapIntensity: 2.2,
+        depthWrite: false,
+        side: DoubleSide,
+      });
+      object.renderOrder = 2;
+    } else if (object.name === "compass_card") {
+      remapUv(geometry);
+      object.material = new MeshBasicMaterial({ map: compassTexture, toneMapped: false });
     }
   });
 
@@ -166,6 +202,10 @@ export async function loadCockpit(): Promise<Cockpit> {
         lastDraw = now;
         drawGauges(ctx, state);
         atlasTexture.needsUpdate = true;
+        if (compassCtx) {
+          drawCompassCard(compassCtx, state.headingDeg);
+          compassTexture.needsUpdate = true;
+        }
       }
       const pull = Math.max(-1, Math.min(1, state.elevator));
       for (const yoke of yokes) {
@@ -598,6 +638,80 @@ function drawGauges(ctx: CanvasRenderingContext2D, s: InstrumentState): void {
     ctx.fill();
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/** The wet compass card: a heading tape seen through the window, lubber line in the middle. */
+function drawCompassCard(ctx: CanvasRenderingContext2D, heading: number): void {
+  const { width, height } = ctx.canvas;
+  ctx.fillStyle = "#e9e3c8";
+  ctx.fillRect(0, 0, width, height);
+  const pxPerDeg = 4;
+  ctx.strokeStyle = "#1b1b1b";
+  ctx.fillStyle = "#1b1b1b";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const first = Math.floor((heading - 40) / 5) * 5;
+  for (let deg = first; deg <= heading + 40; deg += 5) {
+    const x = width / 2 + (deg - heading) * pxPerDeg;
+    const norm = ((deg % 360) + 360) % 360;
+    const major = norm % 30 === 0;
+    ctx.lineWidth = major ? 3 : 2;
+    ctx.beginPath();
+    ctx.moveTo(x, height - 4);
+    ctx.lineTo(x, height - (major ? 34 : norm % 10 === 0 ? 24 : 16));
+    ctx.stroke();
+    if (major) {
+      const label = ({ 0: "N", 90: "E", 180: "S", 270: "W" } as Record<number, string>)[norm] ?? String(norm / 10);
+      ctx.font = `700 ${label.length === 1 && "NESW".includes(label) ? 40 : 34}px Helvetica, Arial, sans-serif`;
+      ctx.fillText(label, x, 36);
+    }
+  }
+  ctx.fillStyle = "#c0392b";
+  ctx.fillRect(width / 2 - 2, 0, 4, height);
+}
+
+/** Placards and switch legends, printed on the transparent sheet over the panel. */
+function drawPlacards(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const at = (x: number, y: number): [number, number] => [(x - DECAL.left) * DECAL.pxPerMeter, (DECAL.top - y) * DECAL.pxPerMeter];
+  const text = (x: number, y: number, value: string, sizeMeters: number, color = "#e8e6df", weight = 700) => {
+    const [px, py] = at(x, y);
+    ctx.fillStyle = color;
+    ctx.font = `${weight} ${Math.round(sizeMeters * DECAL.pxPerMeter)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(value, px, py);
+  };
+  // Rocker switch legends over the white strip above the switches.
+  ["BAT", "ALT", "BCN", "LAND", "TAXI", "NAV", "STRB", "PITOT", "AVN"].forEach((label, i) => {
+    text(-0.48 + i * 0.031, 0.03, label, 0.0072, "#1b1b1b");
+  });
+  text(-0.355, 0.045, "MASTER                    LIGHTS                    AVIONICS", 0.006, "#e8e6df", 600);
+  text(-0.475, 0.087, "MAGNETOS", 0.0068);
+  text(-0.475, 0.035, "OFF  R  L  BOTH  START", 0.0048, "#e8e6df", 600);
+  // Engine controls and flaps.
+  text(0.0, -0.012, "THROTTLE", 0.0062, "#1b1b1b");
+  text(0.055, -0.012, "MIXTURE", 0.0062, "#1b1b1b");
+  text(0.255, 0.098, "WING FLAPS", 0.0068);
+  ["0°", "10°", "20°", "FULL"].forEach((label, i) => text(0.297, 0.05 - i * 0.02, label, 0.0058));
+  // Right side: fuel, Hobbs, ELT, and the operating-limitations placard.
+  text(0.355, 0.275, "FUEL QUANTITY", 0.0064, "#1b1b1b");
+  text(0.45, 0.367, "HOURS", 0.0056);
+  text(0.45, 0.304, "ELT", 0.0064);
+  text(0.43, 0.228, "THIS AIRPLANE MUST BE OPERATED", 0.0046, "#1b1b1b", 600);
+  text(0.43, 0.216, "AS A NORMAL OR UTILITY CATEGORY", 0.0046, "#1b1b1b", 600);
+  text(0.43, 0.204, "AIRPLANE PER THE POH", 0.0046, "#1b1b1b", 600);
+  // Left side: maneuvering speed and the tach and engine labels.
+  text(-0.462, 0.395, "MANEUVERING", 0.0052);
+  text(-0.462, 0.384, "SPEED 105 KIAS", 0.0052);
+  text(0.13, 0.443, "C-CMLD", 0.0085);
+  // Circuit breaker ratings.
+  ["5", "10", "15", "5", "5", "10", "15", "5", "2", "5", "10"].forEach((rating, i) => text(0.25 + i * 0.024, -0.008, rating, 0.0055));
+  text(0.37, -0.051, "CIRCUIT BREAKERS", 0.0058);
 }
 
 function drawAnnunciator(canvas: HTMLCanvasElement): void {

@@ -107,6 +107,12 @@ M = {
     "screen": material("screen_black", 0x050607, 0.3),
     "radio_face": material("radio_face", 0x1b1c1e, 0.6),
     "compass_card": material("compass_card", 0xe9e3c8, 0.6),
+    "piping": material("glareshield_piping", 0x2a2d33, 0.7),
+    "stitch": material("stitching", 0x5c6068, 0.8),
+    "glove": material("glove_leather", 0x3d2f25, 0.7),
+    "glove_cuff": material("glove_cuff", 0x24201c, 0.8),
+    "seam": material("panel_seam", 0x3e4146, 0.7),
+    "screw": material("screw_head", 0x9a9ea4, 0.4, 0.8),
     "shirt": material("pilot_shirt", 0x34506e, 0.9),
     "skin": material("pilot_skin", 0xe0b394, 0.8),
     "hair": material("pilot_hair", 0x2d241c, 0.9),
@@ -427,7 +433,7 @@ def build_lining():
 # ---------------------------------------------------------------------------
 
 PANEL_Z = -0.86
-YOKE_Y = 0.15
+YOKE_Y = 0.19
 PANEL_BOTTOM = -0.06
 # The cabin wall is about 0.52 m out at panel height, so the panel runs right to it.
 PANEL_HALF_WIDTH = 0.5
@@ -587,17 +593,55 @@ def build_panel_fittings():
     return part.finish(recalc=True, modifiers=[bevel(0.0015, 1, 50)])
 
 
+def build_panel_details():
+    """Seams between the panel sections, screw heads, the placard decal layer, and gauge glass."""
+    front = PANEL_Z + 0.0012
+    seams = Part("panel_seams")
+    for x in (-0.085, 0.03, 0.232):
+        seams.box((x, (PANEL_BOTTOM + panel_top(x)) / 2, front), (0.003, panel_top(x) - PANEL_BOTTOM - 0.01, 0.002), M["seam"])
+    seams.box((0, 0.05, front), (2 * PANEL_HALF_WIDTH - 0.02, 0.003, 0.002), M["seam"])
+    screws = []
+    for x in (-0.47, -0.32, -0.17, -0.1, 0.045, 0.215, 0.25, 0.4, 0.47):
+        screws.append((x, panel_top(x) - 0.012))
+        screws.append((x, PANEL_BOTTOM + 0.012))
+    for x, y in ((0.045, 0.43), (0.215, 0.43), (0.045, 0.075), (0.215, 0.075), (-0.1, 0.065), (0.02, 0.065), (0.245, 0.065), (0.49, 0.065)):
+        screws.append((x, y))
+    for x, y in screws:
+        seams.cylinder((x, y, PANEL_Z - 0.001), (x, y, PANEL_Z + 0.0035), 0.0032, M["screw"], sides=8)
+    seams.finish(recalc=True)
+
+    # A transparent decal sheet over the panel; the sim prints the placard text on it.
+    decals = Part("panel_decals")
+    z = PANEL_Z + 0.0022
+    left, right, low, high = -PANEL_HALF_WIDTH, PANEL_HALF_WIDTH, PANEL_BOTTOM, panel_top(0.0)
+    decals.poly([P(left, low, z), P(right, low, z), P(right, high, z), P(left, high, z)], M["placard"])
+    obj = decals.finish(recalc=False)
+    set_uv_planar(obj, 0.0, (low + high) / 2, PANEL_HALF_WIDTH, (high - low) / 2)
+
+    # Glass over every instrument, a little proud of the dial.
+    glass = Part("gauge_glass")
+    for name, (x, y, r) in GAUGES.items():
+        glass.disc_facing_pilot(x, y, PANEL_Z + 0.0005, r + 0.001, M["dial"], sides=32)
+    for name, (x, y, half) in RECT_GAUGES.items():
+        z = PANEL_Z - 0.004
+        glass.poly([P(x - half, y - half, z), P(x + half, y - half, z), P(x + half, y + half, z), P(x - half, y + half, z)], M["dial"])
+    glass.finish(recalc=False)
+
+
 def build_glareshield():
     """A padded arc over the panel, running forward to the windshield."""
     part = Part("glareshield")
     top = panel_top(0.0)
+    # The back slopes down to the windshield base, staying just inside the
+    # glass (which rises from y 0.48 at the firewall) so nothing pokes out.
     profile = [
-        (top - 0.012, PANEL_Z + 0.004),
-        (top + 0.01, PANEL_Z + 0.026),
-        (top + 0.03, PANEL_Z + 0.016),
-        (top + 0.036, PANEL_Z - 0.02),
-        (top + 0.04, PANEL_Z - 0.14),
-        (top + 0.046, -1.29),
+        (top - 0.006, PANEL_Z + 0.004),
+        (top + 0.012, PANEL_Z + 0.02),
+        (top + 0.034, PANEL_Z + 0.014),
+        (top + 0.048, PANEL_Z - 0.02),
+        (top + 0.06, PANEL_Z - 0.16),
+        (top + 0.064, -1.2),
+        (0.486, -1.29),
         (top - 0.04, -1.29),
         (top - 0.04, PANEL_Z - 0.06),
     ]
@@ -608,18 +652,43 @@ def build_glareshield():
         rings.append([P(x, y - drop, z) for y, z in profile])
     # Loft across x: build as rings along the x axis.
     part.loft(rings, M["glare"], closed=True, caps=True)
-    return part.finish(smooth_angle=50, modifiers=[subsurf(1)])
+    shield = part.finish(smooth_angle=50, modifiers=[subsurf(1)])
+
+    # Piping along the lip, with a row of stitches just above it.
+    piping = Part("glareshield_piping")
+    def lip(x, dy=0.0, dz=0.0):
+        drop = top - panel_top(min(abs(x), PANEL_HALF_WIDTH))
+        return (x, top + 0.006 - drop + dy, PANEL_Z + 0.022 + dz)
+    xs_fine = [-0.53 + i * 1.06 / 60 for i in range(61)]
+    for a, b in zip(xs_fine, xs_fine[1:]):
+        piping.cylinder(lip(a), lip(b), 0.0045, M["piping"], sides=8)
+    for k in range(0, 60, 2):
+        a, b = xs_fine[k], xs_fine[k] + 0.009
+        piping.cylinder(lip(a, 0.017, -0.004), lip(b, 0.017, -0.004), 0.0012, M["stitch"], sides=4)
+    piping.finish(smooth_angle=60)
+    return shield
 
 
 def build_compass():
     part = Part("compass")
     top = panel_top(0.0)
     base = (0.1, top + 0.045, PANEL_Z - 0.12)
-    part.box((base[0], base[1] + 0.03, base[2]), (0.07, 0.055, 0.06), M["bezel"])
-    part.box((base[0], base[1], base[2]), (0.045, 0.02, 0.05), M["bezel"])
-    part.box((base[0], base[1] + 0.033, base[2] + 0.0305), (0.05, 0.026, 0.001), M["compass_card"])
-    part.box((base[0], base[1] + 0.033, base[2] + 0.0312), (0.0015, 0.032, 0.001), M["switch_red"])
-    return part.finish(recalc=True, modifiers=[bevel(0.004, 2, 40)])
+    # Rounded housing on a short pedestal, its window facing the pilot.
+    part.box((base[0], base[1] + 0.034, base[2]), (0.072, 0.058, 0.064), M["bezel"])
+    part.box((base[0], base[1] + 0.002, base[2] + 0.004), (0.04, 0.02, 0.04), M["bezel"])
+    housing = part.finish(recalc=True, modifiers=[bevel(0.016, 4, 30)])
+    rim = Part("compass_rim")
+    cx, cy, cz = base[0], base[1] + 0.036, base[2] + 0.0322
+    outer = [P(cx - 0.03, cy - 0.016, cz), P(cx + 0.03, cy - 0.016, cz), P(cx + 0.03, cy + 0.016, cz), P(cx - 0.03, cy + 0.016, cz)]
+    inner = [P(cx - 0.025, cy - 0.012, cz + 0.002), P(cx + 0.025, cy - 0.012, cz + 0.002), P(cx + 0.025, cy + 0.012, cz + 0.002), P(cx - 0.025, cy + 0.012, cz + 0.002)]
+    rim.loft([outer, inner], M["chrome"], caps=False)
+    rim.finish(recalc=False)
+    card = Part("compass_card")
+    z = cz + 0.0008  # just in front of the housing face, inside the rim
+    card.poly([P(cx - 0.025, cy - 0.012, z), P(cx + 0.025, cy - 0.012, z), P(cx + 0.025, cy + 0.012, z), P(cx - 0.025, cy + 0.012, z)], M["compass_card"])
+    obj = card.finish(recalc=False)
+    set_uv_planar(obj, cx, cy, 0.025, 0.012)
+    return housing
 
 
 # ---------------------------------------------------------------------------
@@ -649,10 +718,10 @@ def build_flap_lever():
     return part.finish(recalc=True, modifiers=[bevel(0.002, 2, 40)], origin=(x, y, PANEL_Z))
 
 
-def build_yoke(name, x):
+def build_yoke(name, x, with_hands=False):
     """Column plus the ram's-horn wheel, pivoting at the panel."""
     part = Part(name)
-    cy, z_wheel = YOKE_Y, PANEL_Z + 0.26
+    cy, z_wheel = YOKE_Y, PANEL_Z + 0.28
     # The chrome shaft runs well into the panel, so it slides out of the
     # fixed collar (in panel_fittings) when you pull back, like the real one.
     part.cylinder((x, cy, PANEL_Z - 0.2), (x, cy, z_wheel - 0.02), 0.011, M["chrome"], sides=14)
@@ -668,7 +737,15 @@ def build_yoke(name, x):
             part.cylinder((x + side * ax, cy + ay, z_wheel + az), (x + side * bx, cy + by, z_wheel + bz), radius, M["yoke"], sides=12)
     # Push-to-talk switch on the left horn.
     part.box((x - 0.13, cy + 0.07, z_wheel + 0.02), (0.012, 0.012, 0.008), M["switch_red"])
-    return part.finish(smooth_angle=45, origin=(x, cy, PANEL_Z))
+    if with_hands:
+        # Gloved hands round the horns, forearms running back toward the seat.
+        for side in (-1, 1):
+            gx, gy, gz = x + side * 0.137, cy + 0.06, z_wheel + 0.008
+            part.box((gx, gy, gz), (0.05, 0.085, 0.055), M["glove"])
+            part.box((gx - side * 0.026, gy + 0.02, gz + 0.01), (0.022, 0.035, 0.03), M["glove"])
+            part.box((gx, gy - 0.05, gz + 0.03), (0.055, 0.03, 0.06), M["glove_cuff"])
+            part.cylinder((gx + side * 0.005, gy - 0.055, gz + 0.05), (gx + side * 0.07, gy - 0.24, gz + 0.36), 0.036, M["shirt"], sides=10, radius_b=0.045)
+    return part.finish(smooth_angle=45, modifiers=[bevel(0.006, 2, 40)] if with_hands else [], origin=(x, cy, PANEL_Z))
 
 
 def build_pedestal():
@@ -762,8 +839,7 @@ def build_pilot():
     part.box((x, FLOOR_Y + 0.33, -0.05), (0.36, 0.14, 0.42), M["pants"])  # thighs
     for side in (-1, 1):
         part.box((x + side * 0.1, FLOOR_Y + 0.1, -0.3), (0.12, 0.38, 0.13), M["pants"], rotation=Matrix.Rotation(math.radians(20), 4, "X"))
-        part.cylinder((x + side * 0.2, FLOOR_Y + 0.75, 0.12), (x + side * 0.15, 0.2, -0.38), 0.045, M["shirt"], sides=8)
-        part.box((x + side * 0.13, 0.2, -0.56), (0.05, 0.06, 0.08), M["skin"])
+        part.cylinder((x + side * 0.2, FLOOR_Y + 0.75, 0.12), (x + side * 0.2, 0.06, -0.24), 0.045, M["shirt"], sides=8)
     part.cylinder((x, FLOOR_Y + 0.81, 0.12), (x, FLOOR_Y + 0.88, 0.12), 0.05, M["skin"], sides=10)
     part.box((x, FLOOR_Y + 0.97, 0.1), (0.17, 0.2, 0.2), M["skin"])
     part.box((x, FLOOR_Y + 1.06, 0.12), (0.18, 0.06, 0.2), M["hair"])
@@ -782,12 +858,13 @@ build_panel()
 build_instrument_backs()
 build_gauge_faces()
 build_panel_fittings()
+build_panel_details()
 build_glareshield()
 build_compass()
 build_knob("throttle", 0.0, M["knob_black"], 0.017, False)
 build_knob("mixture", 0.055, M["knob_red"], 0.014, True)
 build_flap_lever()
-build_yoke("yoke_left", -0.27)
+build_yoke("yoke_left", -0.27, with_hands=True)
 build_yoke("yoke_right", 0.27)
 build_pedestal()
 build_trim_wheel()
@@ -820,6 +897,9 @@ print(f"[cabin] wrote {GLB_OUT} ({os.path.getsize(GLB_OUT) / 1024:.0f} KB)")
 
 def render_previews(directory):
     os.makedirs(directory, exist_ok=True)
+    # These get transparent materials in the sim; Blender would show them as solid sheets.
+    for name in ("panel_decals", "gauge_glass", "pilot"):
+        bpy.data.objects[name].hide_render = True
     for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT", "BLENDER_WORKBENCH"):
         try:
             scene.render.engine = engine
