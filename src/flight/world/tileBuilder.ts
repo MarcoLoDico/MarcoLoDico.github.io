@@ -945,6 +945,40 @@ function generateHouses(
       }
     }
   }
+  // Local street length per ~300 m cell: a tight street grid on land the map
+  // doesn't classify is a neighbourhood too (most of San Francisco isn't
+  // tagged residential), while rural concession roads are far too sparse.
+  const GRID_CELLS = 8;
+  const streetMeters = new Float32Array(GRID_CELLS * GRID_CELLS);
+  for (const road of roads) {
+    if (road.width > 12) {
+      continue;
+    }
+    for (let k = 0; k + 1 < road.line.length; k++) {
+      const a = road.line[k];
+      const b = road.line[k + 1];
+      if (!a || !b) {
+        continue;
+      }
+      const gx = Math.floor(((a.x + b.x) / 2 / extent) * GRID_CELLS);
+      const gy = Math.floor(((a.y + b.y) / 2 / extent) * GRID_CELLS);
+      if (gx >= 0 && gy >= 0 && gx < GRID_CELLS && gy < GRID_CELLS) {
+        const cell = gy * GRID_CELLS + gx;
+        streetMeters[cell] = (streetMeters[cell] ?? 0) + Math.hypot(b.x - a.x, b.y - a.y) * metersPerUnit;
+      }
+    }
+  }
+  const cellKm2 = ((extent * metersPerUnit) / GRID_CELLS / 1000) ** 2;
+  const denseStreets = (px: number, py: number) => {
+    const gx = Math.min(GRID_CELLS - 1, Math.max(0, Math.floor((px / extent) * GRID_CELLS)));
+    const gy = Math.min(GRID_CELLS - 1, Math.max(0, Math.floor((py / extent) * GRID_CELLS)));
+    return (streetMeters[gy * GRID_CELLS + gx] ?? 0) / 1000 / cellKm2 > 7;
+  };
+  const housesAllowed = (px: number, py: number) => {
+    const cls = coverAt(px / extent, py / extent);
+    return cls === Cover.Residential || (cls === Cover.Land && denseStreets(px, py));
+  };
+
   // Spatial hash of road segments so lot checks stay cheap.
   const BUCKET = 64;
   const buckets = new Map<number, RoadSegment[]>();
@@ -1005,7 +1039,7 @@ function generateHouses(
         if (cx < 0 || cy < 0 || cx > extent || cy > extent || isOccupied(cx, cy)) {
           continue;
         }
-        if (coverAt(cx / extent, cy / extent) !== Cover.Residential) {
+        if (!housesAllowed(cx, cy)) {
           continue;
         }
         const corner = (a: number, b: number): VectorPoint => ({
