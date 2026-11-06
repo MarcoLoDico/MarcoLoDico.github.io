@@ -787,11 +787,11 @@ export function buildTile(input: TileInputs): TileGeometry {
       }
 
       if (!generated && height >= 8 && z >= 14) {
-        // Record: vertex count, top altitude, centre, bounding radius, then the
+        // Record: vertex count, bottom and top altitudes, centre, bounding radius, then the
         // footprint as metre offsets east/north of the centre (precise in float32).
         const metersPerDegLat = 111_320;
         const metersPerDegLon = 111_320 * Math.cos((centerLat * Math.PI) / 180);
-        obstacles.push(ring.length, top, centerLat, centerLon, radius);
+        obstacles.push(ring.length, bottom, top, centerLat, centerLon, radius);
         for (const pt of ring) {
           const lat = tileYToLat(y + pt.y / extent, z);
           const lon = tileXToLon(x + pt.x / extent, z);

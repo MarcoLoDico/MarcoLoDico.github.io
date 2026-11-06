@@ -44,8 +44,9 @@ export interface BuiltTile {
   /** One flag per terrain triangle (two per cell): 1 where it is water. */
   readonly water: Uint8Array;
   /**
-   * Buildings for collisions, as records of [vertexCount, topAltitude, lat,
-   * lon, radius, then vertexCount (east, north) footprint offsets in metres].
+   * Buildings for collisions, as records of [vertexCount, bottomAltitude,
+   * topAltitude, lat, lon, radius, then vertexCount (east, north) footprint
+   * offsets in metres].
    */
   readonly obstacles: Float32Array;
   /** Per-vertex facade coordinates (metres along and up each wall) for the window shader. */

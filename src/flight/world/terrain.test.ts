@@ -6,6 +6,7 @@ const longBuilding: Obstacle = {
   lat: 43.65,
   lon: -79.38,
   radius: Math.hypot(20, 5),
+  bottom: 70,
   top: 120,
   footprint: new Float32Array([-20, -5, 20, -5, 20, 5, -20, 5]),
 };

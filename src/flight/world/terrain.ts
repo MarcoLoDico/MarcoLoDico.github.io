@@ -39,6 +39,8 @@ export interface Obstacle {
   readonly lat: number;
   readonly lon: number;
   readonly radius: number;
+  /** Altitudes of the underside and roof; the underside is above ground for raised building parts. */
+  readonly bottom: number;
   readonly top: number;
   /** Footprint as (east, north) metre offsets from lat/lon, flattened. */
   readonly footprint: Float32Array;
@@ -313,13 +315,14 @@ export class Terrain {
         for (let k = 0; k < list.length; ) {
           const count = list[k] ?? 0;
           yield {
-            top: list[k + 1] ?? 0,
-            lat: list[k + 2] ?? 0,
-            lon: list[k + 3] ?? 0,
-            radius: list[k + 4] ?? 0,
-            footprint: list.subarray(k + 5, k + 5 + count * 2),
+            bottom: list[k + 1] ?? 0,
+            top: list[k + 2] ?? 0,
+            lat: list[k + 3] ?? 0,
+            lon: list[k + 4] ?? 0,
+            radius: list[k + 5] ?? 0,
+            footprint: list.subarray(k + 6, k + 6 + count * 2),
           };
-          k += 5 + count * 2;
+          k += 6 + count * 2;
         }
       }
     }

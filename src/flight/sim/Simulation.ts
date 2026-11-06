@@ -465,7 +465,7 @@ export class Simulation {
     const a = this.aircraft;
     const centre = this.frame.toGeodetic(a.position.x, a.position.y, a.position.z);
     const nearby = [...this.terrain.obstaclesNear(centre.lat, centre.lon)].filter(
-      (o) => centre.alt - 8 < o.top && distanceMeters(centre, o) < o.radius + 8,
+      (o) => centre.alt - 8 < o.top && centre.alt + 8 > o.bottom && distanceMeters(centre, o) < o.radius + 8,
     );
     for (const [bx, by, bz] of COLLISION_POINTS) {
       const p = this.tmp.set(bx, by, bz).applyQuaternion(a.orientation).add(a.position);
@@ -480,7 +480,7 @@ export class Simulation {
       }
       const g = this.frame.toGeodetic(p.x, p.y, p.z);
       for (const obstacle of nearby) {
-        if (g.alt >= obstacle.top) {
+        if (g.alt >= obstacle.top || g.alt <= obstacle.bottom) {
           continue;
         }
         const east = (g.lon - obstacle.lon) * 111_320 * Math.cos((obstacle.lat * Math.PI) / 180);
